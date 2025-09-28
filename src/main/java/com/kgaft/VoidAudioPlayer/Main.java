@@ -89,6 +89,8 @@ class AlbumPlacingCallback implements IOnAlbumSelected, ActionListener, IOnTrack
     }
 }
 
+//Testing purposes only, in future will be organised!
+
 public class Main {
     static {
         File file = new File("target/debug");
