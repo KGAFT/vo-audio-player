@@ -1,0 +1,20 @@
+[package]
+name = "vo-audio-player"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib"]
+path="src/main/rust/lib.rs"
+name = "vobackend"
+
+[dependencies]
+gstreamer = "0.22"
+rfd = "0.15"
+lofty = "0.22"
+jni = "0.21"
+#asio-sys = "0.2"
+dsf = "0.2.2"
+id3 = "1.16.3"
+bincode = { version = "2", features = ["serde"] }
+serde = { version = "1.0.223", features = ["derive"] }
