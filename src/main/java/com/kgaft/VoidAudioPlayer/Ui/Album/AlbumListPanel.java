@@ -76,6 +76,7 @@ public class AlbumListPanel extends JScrollPane {
         });
         setViewportView(albumPanel);
         albumPanel.invalidate();
+        getVerticalScrollBar().setUnitIncrement(18);
         invalidate();
     }
 

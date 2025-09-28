@@ -2,7 +2,7 @@ use dsf::DsfFile;
 use id3::{Tag, TagLike};
 use jni::JNIEnv;
 use jni::objects::{JObject, JValue};
-use jni::sys::{jbyte, jint, jobject};
+use jni::sys::{jbyte, jint, jlong, jobject};
 use lofty::file::{AudioFile, TaggedFileExt};
 use lofty::tag::Accessor;
 use serde::{Deserialize, Serialize};
@@ -75,6 +75,7 @@ impl Track {
         let sample_rate: jint = properties.sample_rate().unwrap_or(0) as jint;
         let channels: jbyte = properties.channels().unwrap_or(0) as jbyte;
         let overall_bitrate: jint = properties.overall_bitrate().unwrap_or(0) as jint;
+        let duration: jlong = properties.duration().as_millis() as jlong;
 
         // Find Track class and constructor
         let track_class = env
@@ -109,12 +110,21 @@ impl Track {
         let int_fields = [
             ("year", year),
             ("sampleRate", sample_rate),
-            ("overallBitrate", overall_bitrate),
+            ("overallBitrate", overall_bitrate)
+        ];
+
+        let long_fields = [
+            ("durationMs", duration),
         ];
 
         for (field_name, value) in int_fields.iter() {
             env.set_field(track_obj.as_ref(), *field_name, "I", JValue::Int(*value))
                 .expect(&format!("Failed to set field {}", field_name));
+        }
+
+        for (field_name, value) in long_fields.iter() {
+            env.set_field(track_obj.as_ref(), *field_name, "J", JValue::Long(*value))
+                .unwrap();
         }
 
         // Set byte fields
@@ -333,6 +343,8 @@ impl Track {
         let bit_depth: jbyte = fmt.bits_per_sample() as jbyte; // usually 1
         let year: jint = tag.year().unwrap_or(0) as jint;
 
+        let duration: jlong = tag.duration().unwrap_or(0) as jlong;
+
         // Approximate bitrate
         let overall_bitrate: jint =
             (sample_rate as i64 * channels as i64 * bit_depth as i64) as jint;
@@ -369,8 +381,18 @@ impl Track {
             ("sampleRate", sample_rate),
             ("overallBitrate", overall_bitrate),
         ];
+
+        let long_fields = [
+            ("durationMs", duration),
+        ];
+
         for (field_name, value) in int_fields.iter() {
             env.set_field(track_obj.as_ref(), *field_name, "I", JValue::Int(*value))
+                .unwrap();
+        }
+
+        for (field_name, value) in long_fields.iter() {
+            env.set_field(track_obj.as_ref(), *field_name, "J", JValue::Long(*value))
                 .unwrap();
         }
 

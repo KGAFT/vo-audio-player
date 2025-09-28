@@ -51,7 +51,7 @@ public class PlayerPanel extends JPanel{
         add(manipulationsPanel, BorderLayout.WEST);
         add(controlFlow,  BorderLayout.CENTER);
         playPauseButton.addActionListener(e -> {
-            if (!playPauseButton.isState()) {
+            if (playPauseButton.isState()) {
                 Player.setPlaying(playerHandle, true);
                 controlFlow.startControlFlow();
             } else {
@@ -61,8 +61,10 @@ public class PlayerPanel extends JPanel{
         });
     }
 
-    public void seekTrack(long offset) {
-        Player.seekTrack(playerHandle, offset);
+    public void seekTrack(float precent) {
+        Player.setPlaying(playerHandle, true);
+        controlFlow.startControlFlow();
+        Player.seekTrack(playerHandle, precent);
     }
 
 

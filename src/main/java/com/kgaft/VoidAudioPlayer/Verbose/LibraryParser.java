@@ -138,9 +138,29 @@ public class LibraryParser {
                     if (i != cueFile.getTracks().size() - 1) {
                         CueTrackInfo info2 = cueFile.getTracks().get(i + 1);
                         CueTrackIndex endIndex = getIndex(info2.getIndexes(), false);
-                        duration = (endIndex.getMinutes() * 60L + endIndex.getSeconds()) * 1000;
+                        duration = (endIndex.getMinutes() * 60L + endIndex.getSeconds()) * 1000 - offset;
+                    } else {
+                        duration = baseTrack.getDurationMs() - offset;
                     }
                     Track track = new Track(baseTrack);
+                    if(baseTrack.getAlbumName() == null || baseTrack.getAlbumName().isEmpty()){
+                        track.setAlbumName(musicFile.getName());
+                        if(track.getAlbumName()==null || track.getAlbumName().isEmpty()){
+                            track.setAlbumName(info.getSongwriter());
+                            if(track.getAlbumName()==null ||track.getAlbumName().isEmpty()){
+                                track.setAlbumName(musicFile.getName());
+                            }
+                        }
+                    }
+                    if(baseTrack.getArtistName() ==null || baseTrack.getArtistName().isEmpty()){
+                        track.setArtistName(info.getPerformer());
+                        if(track.getArtistName()==null || track.getArtistName().isEmpty()){
+                            track.setArtistName(info.getSongwriter());
+                            if(track.getArtistName()==null ||track.getArtistName().isEmpty()){
+                                track.setArtistName(track.getAlbumName());
+                            }
+                        }
+                    }
                     track.setName(info.getTitle());
                     track.setOffsetMs(offset);
                     track.setDurationMs(duration);
@@ -153,6 +173,8 @@ public class LibraryParser {
                 } else {
                     tracks.add(baseTrack);
                     tryToFindOrCreateAlbum(tracks, albums, newAlbums, false);
+                    artistNames.add(tracks.getFirst().getArtistName());
+                    filesToRemove.add(musicFile);
                     //         System.out.println(musicFile.getAbsolutePath());
                 }
 
@@ -212,20 +234,11 @@ public class LibraryParser {
     }
 
     public static CueTrackIndex getIndex(Map<Integer, CueTrackIndex> indexes, boolean isEnd) {
-        int index = 0;
+        int index = 1;
         CueTrackIndex index2 = indexes.get(index);
         while (index2 == null) {
             index++;
             index2 = indexes.get(index);
-        }
-        if (isEnd) {
-            while (index2 != null) {
-                index++;
-                index2 = indexes.get(index);
-            }
-            index--;
-            index2 = indexes.get(index);
-            return index2;
         }
         return index2;
     }

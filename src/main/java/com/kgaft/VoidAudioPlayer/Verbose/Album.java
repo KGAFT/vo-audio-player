@@ -8,12 +8,13 @@ import java.util.Comparator;
 import java.util.List;
 
 public class Album {
-    private String artist;
+    private String artist = "";
     private byte[] cover;
-    private String name;
+    private String name = "";
     private List<Track> tracks = new ArrayList<>();
     private int year;
-    private String genre;
+    private String genre = "";
+    private long duration = 0;
 
     public Album(byte[] cover, String name, List<Track> tracks) {
         this.cover = cover;
@@ -50,6 +51,15 @@ public class Album {
 
     public byte[] getCover() {
         return cover;
+    }
+
+    public long getDuration() {
+        if (duration == 0) {
+            for (Track track : tracks) {
+                duration += track.getDurationMs();
+            }
+        }
+        return duration;
     }
 
     public void sortTracks() {

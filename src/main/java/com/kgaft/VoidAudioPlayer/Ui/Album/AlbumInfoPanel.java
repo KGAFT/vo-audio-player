@@ -73,6 +73,7 @@ public class AlbumInfoPanel extends JPanel {
         songsPanel.setLayout(new GridLayout(0, 1));
 
         songsScroll.setViewportView(songsPanel);
+        songsScroll.getVerticalScrollBar().setUnitIncrement(18);
 
         setLayout(new BorderLayout());
         add(albumInfoPanel, BorderLayout.NORTH);
@@ -81,7 +82,7 @@ public class AlbumInfoPanel extends JPanel {
 
         int counter = 1;
         for (Track track : album.getTracks()) {
-            TrackEntry entry = new TrackEntry(track.getName(), counter, (int)(track.getDurationMs()/1000));
+            TrackEntry entry = new TrackEntry(track.getName(), counter, (int)(track.getDurationMs()));
             entry.addOnPlayButtonListener(new PActionListener(track, this));
             songsPanel.add(entry);
             counter++;
