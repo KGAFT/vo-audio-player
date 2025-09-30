@@ -2,6 +2,8 @@ package com.kgaft.VoidAudioPlayer.Ui;
 
 import com.kgaft.VoidAudioPlayer.Native.Track;
 import com.kgaft.VoidAudioPlayer.Ui.Util.ImageInflater;
+import com.kgaft.VoidAudioPlayer.Ui.Util.ImageResizer;
+import com.kgaft.VoidAudioPlayer.Ui.Util.ResizerWorkMode;
 
 import javax.imageio.ImageIO;
 import javax.swing.*;
@@ -21,7 +23,7 @@ public class TrackPanel extends JPanel {
     private JLabel sampleRateLabel;
     private JLabel channelsLabel;
     private JLabel bitrateLabel;
-
+    private ImageResizer imageResize = new ImageResizer(0.8f, 0.8f, ResizerWorkMode.USE_MINIMUM);
     public TrackPanel(Track track) {
         setLayout(new BorderLayout(10, 10));
         setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
@@ -31,15 +33,14 @@ public class TrackPanel extends JPanel {
         coverLabel.setPreferredSize(new Dimension(250, 250));
         if (track.getPictureBytes() != null) {
             try {
-                BufferedImage img = ImageIO.read(new ByteArrayInputStream(track.getPictureBytes()));
-                if (img != null) {
-                    coverLabel.setIcon(ImageInflater.loadImage(track.getPictureBytes(), 250, 250));
-                }
+
+                coverLabel.setIcon(ImageInflater.loadImage(track.getPictureBytes(), 250, 250));
+                imageResize.pushLabelBytes(track.getPictureBytes(), coverLabel);
             } catch (Exception ignored) {
             }
         }
-        add(coverLabel, BorderLayout.CENTER);
-
+        add(coverLabel, BorderLayout.NORTH);
+        addComponentListener(imageResize);
         // Info panel
         JPanel infoPanel = new JPanel();
         infoPanel.setLayout(new GridLayout(0, 1, 5, 5));
@@ -70,7 +71,7 @@ public class TrackPanel extends JPanel {
         infoPanel.add(channelsLabel);
         infoPanel.add(bitrateLabel);
 
-        add(infoPanel, BorderLayout.SOUTH);
+        add(infoPanel, BorderLayout.CENTER);
     }
 
     private String safe(String val) {

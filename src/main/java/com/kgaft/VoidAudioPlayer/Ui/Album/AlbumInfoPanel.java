@@ -1,14 +1,16 @@
 package com.kgaft.VoidAudioPlayer.Ui.Album;
 
 import com.kgaft.VoidAudioPlayer.Native.Track;
-import com.kgaft.VoidAudioPlayer.Ui.Util.IconInflater;
-import com.kgaft.VoidAudioPlayer.Ui.Util.ImageInflater;
+import com.kgaft.VoidAudioPlayer.Ui.TrackEntry;
+import com.kgaft.VoidAudioPlayer.Ui.Util.*;
 import com.kgaft.VoidAudioPlayer.Verbose.Album;
 
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.ComponentEvent;
+import java.awt.event.ComponentListener;
 
 class PActionListener implements ActionListener {
     private Track track;
@@ -25,7 +27,7 @@ class PActionListener implements ActionListener {
     }
 }
 
-public class AlbumInfoPanel extends JPanel {
+public class AlbumInfoPanel extends JPanel implements ComponentListener {
     private JLabel albumCover;
     private JLabel albumNameLabel;
     private JLabel albumArtistLabel;
@@ -38,22 +40,33 @@ public class AlbumInfoPanel extends JPanel {
     private JScrollPane songsScroll;
     private JButton backButton;
     protected IOnTrackSelected onTrackSelected;
-
-
+    private IconResizer iconResizer = new IconResizer(0.05f, 0.05f, ResizerWorkMode.USE_MINIMUM);
+    private ImageResizer imageResizer = new ImageResizer(0.6f, 0.6f, ResizerWorkMode.USE_MINIMUM);
     public AlbumInfoPanel(Album album) {
         albumCover = new JLabel();
         albumNameLabel = new JLabel(album.getName());
         albumArtistLabel = new JLabel(album.getArtist());
         albumYearLabel = new JLabel(""+album.getYear());
         genreLabel = new JLabel(album.getGenre());
+        
+        
         backButton = new JButton(IconInflater.loadIcon("icons/back.svg", 10, 10));
+        iconResizer.pushButton("icons/back.svg", backButton);
+
+
         songsScroll = new JScrollPane(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS,
                 JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         if(album.getCover()!=null && album.getCover().length !=0) {
             Icon scaled = ImageInflater.loadImage(album.getCover(), 150, 150);
             albumCover.setIcon(scaled);
+            imageResizer.pushLabelBytes(album.getCover(), albumCover);
+
             albumCover.setPreferredSize(new Dimension(scaled.getIconWidth(), scaled.getIconHeight()));
+            addComponentListener(imageResizer);
         }
+        addComponentListener(iconResizer);
+        addComponentListener(this);
+
         albumInfoPanel = new JPanel();
         albumInfoPanel.setLayout(new BorderLayout());
         albumTextInfoPanel = new JPanel();
@@ -67,7 +80,7 @@ public class AlbumInfoPanel extends JPanel {
 
         albumInfoPanel.add(albumCover, BorderLayout.CENTER);
         albumInfoPanel.add(albumTextInfoPanel, BorderLayout.SOUTH);
-        albumInfoPanel.setPreferredSize(new Dimension(0, 200));
+        albumInfoPanel.setPreferredSize(new Dimension(100, 200));
 
         songsPanel = new JPanel();
         songsPanel.setLayout(new GridLayout(0, 1));
@@ -82,7 +95,7 @@ public class AlbumInfoPanel extends JPanel {
 
         int counter = 1;
         for (Track track : album.getTracks()) {
-            TrackEntry entry = new TrackEntry(track.getName(), counter, (int)(track.getDurationMs()));
+            TrackEntry entry = new TrackEntry(track.getName(), counter, (int)(track.getDurationMs()), false);
             entry.addOnPlayButtonListener(new PActionListener(track, this));
             songsPanel.add(entry);
             counter++;
@@ -95,5 +108,28 @@ public class AlbumInfoPanel extends JPanel {
 
     public void onTrackSelected(IOnTrackSelected onTrackSelected) {
         this.onTrackSelected = onTrackSelected;
+    }
+
+    @Override
+    public void componentResized(ComponentEvent e) {
+        albumInfoPanel.setPreferredSize(new Dimension(getWidth()/8, getHeight()/3));
+        albumInfoPanel.repaint();
+        albumInfoPanel.revalidate();
+        albumInfoPanel.validate();
+    }
+
+    @Override
+    public void componentMoved(ComponentEvent e) {
+
+    }
+
+    @Override
+    public void componentShown(ComponentEvent e) {
+
+    }
+
+    @Override
+    public void componentHidden(ComponentEvent e) {
+
     }
 }

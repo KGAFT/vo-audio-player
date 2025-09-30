@@ -1,7 +1,4 @@
-package com.kgaft.VoidAudioPlayer.Ui.Album;
-
-import com.kgaft.VoidAudioPlayer.Ui.Util.DualStateButton;
-import com.kgaft.VoidAudioPlayer.Ui.Util.IconInflater;
+package com.kgaft.VoidAudioPlayer.Ui;
 
 import javax.swing.*;
 import java.awt.*;
@@ -16,6 +13,7 @@ public class TrackEntry extends JPanel implements MouseListener {
     private JLabel trackDurationLabel;
     private JPanel leftSidePanel;
     private JPanel rightSidePanel;
+    private JButton deleteButton;
     private ActionListener actionListener = null;
     private Color oldBackground;
 
@@ -26,8 +24,17 @@ public class TrackEntry extends JPanel implements MouseListener {
         return String.format("%02d:%02d", minutes, seconds);
     }
 
-    public TrackEntry(String trackName, int trackNumber, int trackDurationMs) {
-        entryNumber = new JLabel("" + trackNumber);
+    public TrackEntry(String trackName, int trackNumber, int trackDurationMs, boolean deleteButton) {
+        if(trackNumber!=-1){
+            entryNumber = new JLabel("" + trackNumber);
+        } else {
+            entryNumber = new JLabel();
+        }
+
+        if(deleteButton){
+            this.deleteButton = new JButton("delete");
+        }
+
         trackNameLabel = new JLabel(trackName);
         trackDurationLabel = new JLabel(formatTime(trackDurationMs));
         leftSidePanel = new JPanel();
