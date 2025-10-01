@@ -19,6 +19,7 @@ target/
 *.nar
 *.ear
 *.zip
+*.db
 *.tar.gz
 *.rar
 index.bin
