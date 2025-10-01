@@ -1,6 +1,6 @@
 package com.kgaft.VoidAudioPlayer.Ui;
 
-import com.kgaft.VoidAudioPlayer.Native.Track;
+import com.kgaft.VoidAudioPlayer.Verbose.Track;
 
 import javax.swing.*;
 import java.util.ArrayList;

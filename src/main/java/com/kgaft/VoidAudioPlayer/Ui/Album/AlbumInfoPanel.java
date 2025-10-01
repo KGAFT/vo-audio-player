@@ -1,6 +1,6 @@
 package com.kgaft.VoidAudioPlayer.Ui.Album;
 
-import com.kgaft.VoidAudioPlayer.Native.Track;
+import com.kgaft.VoidAudioPlayer.Verbose.Track;
 import com.kgaft.VoidAudioPlayer.Ui.TrackEntry;
 import com.kgaft.VoidAudioPlayer.Ui.Util.*;
 import com.kgaft.VoidAudioPlayer.Verbose.Album;

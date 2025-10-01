@@ -1,6 +1,6 @@
 package com.kgaft.VoidAudioPlayer;
 
-import com.kgaft.VoidAudioPlayer.Native.Track;
+import com.kgaft.VoidAudioPlayer.Verbose.Track;
 import com.kgaft.VoidAudioPlayer.Ui.Album.AlbumInfoPanel;
 import com.kgaft.VoidAudioPlayer.Ui.Album.AlbumListPanel;
 import com.kgaft.VoidAudioPlayer.Ui.Album.IOnAlbumSelected;
@@ -29,7 +29,7 @@ public class PlayerWindow extends JFrame implements IOnAlbumSelected, ActionList
     public PlayerWindow(List<Album> albums) {
         super("VoidAudioPlayer");
         this.albumList = albums;
-        trackPanel = new TrackPanel(albumList.get(5).getTracks().get(0));
+        trackPanel = new TrackPanel(albumList.getFirst().getTracks().stream().filter(t -> true).findFirst().get());
         albumListPanel = new AlbumListPanel(albumList);
         setSize(800, 600);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
@@ -74,7 +74,7 @@ public class PlayerWindow extends JFrame implements IOnAlbumSelected, ActionList
 
     @Override
     public void onTrackSelected(Track track) {
-        if(firstLoad || track.getOffsetMs() == 0) {
+        if (firstLoad || track.getOffsetMs() == 0) {
             playerPanel.loadTrack("\\" + track.getPath());
             try {
                 Thread.sleep(500);

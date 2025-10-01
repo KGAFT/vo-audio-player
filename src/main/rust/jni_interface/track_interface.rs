@@ -4,7 +4,7 @@ use jni::objects::{JClass, JString};
 use jni::sys::jobject;
 
 #[unsafe(no_mangle)]
-pub unsafe extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_Track_getTrackInfo(
+pub unsafe extern "system" fn Java_com_kgaft_VoidAudioPlayer_Verbose_Track_getTrackInfo(
     mut env: JNIEnv,
     _class: JClass,
     path: JString,

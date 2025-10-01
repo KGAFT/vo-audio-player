@@ -1,23 +1,42 @@
-package com.kgaft.VoidAudioPlayer.Native;
+package com.kgaft.VoidAudioPlayer.Verbose;
 
+import com.j256.ormlite.field.DatabaseField;
+import com.j256.ormlite.table.DatabaseTable;
+
+@DatabaseTable(tableName = "tracks")
 public class Track {
     //Heavily memory load, use only for displaying about one track
     public static native Track getTrackInfo(String path);
-
-
+    @DatabaseField(generatedId = true)
+    private long id;
+    @DatabaseField(canBeNull = false)
     private String name;
+    @DatabaseField
     private String albumName;
+    @DatabaseField
     private String artistName;
+    @DatabaseField
     private String genre;
+    @DatabaseField
     private String path;
+    @DatabaseField
     private int year;
+    @DatabaseField
     private byte bitDepth;
+    @DatabaseField
     private int sampleRate;
+    @DatabaseField
     private byte channels;
+    @DatabaseField
     private int overallBitrate;
+    @DatabaseField(dataType = com.j256.ormlite.field.DataType.BYTE_ARRAY)
     private byte[] pictureBytes;
+    @DatabaseField
     private long offsetMs;
+    @DatabaseField
     private long durationMs;
+    @DatabaseField(foreign = true, foreignAutoRefresh = true, foreignAutoCreate = true)
+    private Album albumObject;
 
     public Track(String name, String albumName, String artistName, String genre, String path) {
         this.name = name;
@@ -77,6 +96,14 @@ public class Track {
 
     public long getDurationMs() {
         return durationMs;
+    }
+
+    public Album getAlbumObject() {
+        return albumObject;
+    }
+
+    public void setAlbumObject(Album albumObject) {
+        this.albumObject = albumObject;
     }
 
     public void setDurationMs(long durationMs) {

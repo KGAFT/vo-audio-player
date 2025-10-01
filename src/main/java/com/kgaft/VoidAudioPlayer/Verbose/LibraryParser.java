@@ -4,7 +4,6 @@ import com.bunjlabs.jecue.CueLoader;
 import com.bunjlabs.jecue.entities.CueSheet;
 import com.bunjlabs.jecue.entities.CueTrackIndex;
 import com.bunjlabs.jecue.entities.CueTrackInfo;
-import com.kgaft.VoidAudioPlayer.Native.Track;
 
 import java.io.File;
 import java.io.IOException;
@@ -207,6 +206,7 @@ public class LibraryParser {
             }
             if (!found) {
                 Album album1 = new Album();
+                album1.setTracksList(true);
                 album1.setName(album);
                 album1.setArtist(track.getArtistName());
                 album1.setCover(track.getPictureBytes());

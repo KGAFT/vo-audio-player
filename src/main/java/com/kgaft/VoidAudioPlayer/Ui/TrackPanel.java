@@ -1,15 +1,12 @@
 package com.kgaft.VoidAudioPlayer.Ui;
 
-import com.kgaft.VoidAudioPlayer.Native.Track;
+import com.kgaft.VoidAudioPlayer.Verbose.Track;
 import com.kgaft.VoidAudioPlayer.Ui.Util.ImageInflater;
 import com.kgaft.VoidAudioPlayer.Ui.Util.ImageResizer;
 import com.kgaft.VoidAudioPlayer.Ui.Util.ResizerWorkMode;
 
-import javax.imageio.ImageIO;
 import javax.swing.*;
 import java.awt.*;
-import java.awt.image.BufferedImage;
-import java.io.ByteArrayInputStream;
 
 public class TrackPanel extends JPanel {
     private JLabel coverLabel;

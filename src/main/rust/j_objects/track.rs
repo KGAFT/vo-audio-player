@@ -79,7 +79,7 @@ impl Track {
 
         // Find Track class and constructor
         let track_class = env
-            .find_class("com/kgaft/VoidAudioPlayer/Native/Track")
+            .find_class("com/kgaft/VoidAudioPlayer/Verbose/Track")
             .expect("Failed to find Track class");
 
         // Create Track object
@@ -152,7 +152,7 @@ impl Track {
 
     pub fn to_jobject(&self, env: &mut JNIEnv) -> jni::errors::Result<jobject> {
         // Find Java class
-        let track_class = env.find_class("com/kgaft/VoidAudioPlayer/Native/Track")?;
+        let track_class = env.find_class("com/kgaft/VoidAudioPlayer/Verbose/Track")?;
 
         // Create empty Track object via no-arg constructor
         let track_obj = env.new_object(track_class, "()V", &[])?;
@@ -351,7 +351,7 @@ impl Track {
 
         // Create Track class
         let track_class = env
-            .find_class("com/kgaft/VoidAudioPlayer/Native/Track")
+            .find_class("com/kgaft/VoidAudioPlayer/Verbose/Track")
             .expect("Failed to find Track class");
         let track_obj = env
             .new_object(track_class, "()V", &[])
@@ -421,7 +421,7 @@ impl Track {
     }
     fn empty_track(path: &str, env: &mut JNIEnv) -> jobject {
         let track_class = env
-            .find_class("com/kgaft/VoidAudioPlayer/Native/Track")
+            .find_class("com/kgaft/VoidAudioPlayer/Verbose/Track")
             .expect("Failed to find Track class");
         let track_obj = env
             .new_object(track_class, "()V", &[])
