@@ -15,6 +15,7 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 public class PlayerWindow extends JFrame implements IOnAlbumSelected, ActionListener, IOnTrackSelected {
     private List<Album> albumList = new ArrayList<>();
@@ -29,7 +30,7 @@ public class PlayerWindow extends JFrame implements IOnAlbumSelected, ActionList
     public PlayerWindow(List<Album> albums) {
         super("VoidAudioPlayer");
         this.albumList = albums;
-        trackPanel = new TrackPanel(albumList.getFirst().getTracks().stream().filter(t -> true).findFirst().get());
+        trackPanel = new TrackPanel(albumList.get(36).getTracks().stream().filter(t -> true).findFirst().get());
         albumListPanel = new AlbumListPanel(albumList);
         setSize(1280, 720);
         setDefaultCloseOperation(EXIT_ON_CLOSE);

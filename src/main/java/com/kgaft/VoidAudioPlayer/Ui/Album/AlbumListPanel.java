@@ -8,6 +8,8 @@ import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 
 class AlbumClickListener implements MouseListener {
     private Album album;
@@ -53,26 +55,40 @@ class AlbumClickListener implements MouseListener {
     }
 }
 
-public class AlbumListPanel extends JScrollPane {
+public class AlbumListPanel extends JScrollPane implements IOnAlbumSelected {
     private JPanel albumPanel = new JPanel();
-    private List<AlbumClickListener> listeners = new ArrayList<AlbumClickListener>();
-
+    private volatile List<AlbumClickListener> listeners = new ArrayList<AlbumClickListener>();
+    private IOnAlbumSelected userListener = null;
     public AlbumListPanel(List<Album> albumList) {
         super(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS,
                 JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         albumPanel.setLayout(new GridLayout(0, 3));
+        //Heavily rendering a lot of album covers, needs multithread
+        Executor executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors()-1);
         albumList.forEach(album -> {
-            if (album.getName().length() <= 0) {
-                System.out.println(album.getArtist());
-                album.getTracks().forEach(track -> {
-                    System.out.println(track.getName() + track.getAlbumName() + track.getPath() + track.getDurationMs());
-                });
+            executor.execute(()-> {
+                if (album.getName().length() <= 0) {
+                    System.out.println(album.getArtist());
+                    album.getTracks().forEach(track -> {
+                        System.out.println(track.getName() + track.getAlbumName() + track.getPath() + track.getDurationMs());
+                    });
+                }
+                AlbumCard albumCard = new AlbumCard(album);
+                AlbumClickListener albumClickListener = new AlbumClickListener(album);
+                albumClickListener.setListener(this);
+                albumPanel.add(albumCard);
+                albumCard.addMouseListener(albumClickListener);
+                listeners.add(albumClickListener);
+            });
+        });
+        new Thread(()->{
+            try {
+                executor.wait();
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
             }
-            AlbumCard albumCard = new AlbumCard(album);
-            AlbumClickListener albumClickListener = new AlbumClickListener(album);
-            albumPanel.add(albumCard);
-            albumCard.addMouseListener(albumClickListener);
-            listeners.add(albumClickListener);
+            albumPanel.invalidate();
+            invalidate();
         });
         setViewportView(albumPanel);
         albumPanel.invalidate();
@@ -81,6 +97,13 @@ public class AlbumListPanel extends JScrollPane {
     }
 
     public void setOnAlbumSelected(IOnAlbumSelected listener) {
-        listeners.forEach(element -> element.setListener(listener));
+        this.userListener = listener;
+    }
+
+    @Override
+    public void onAlbumSelected(Album album) {
+        if(userListener != null) {
+            userListener.onAlbumSelected(album);
+        }
     }
 }

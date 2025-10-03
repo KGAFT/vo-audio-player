@@ -27,11 +27,10 @@ public class TrackPanel extends JPanel {
 
         // Cover art
         coverLabel = new JLabel();
-        coverLabel.setPreferredSize(new Dimension(250, 250));
+        coverLabel.setPreferredSize(new Dimension(200, 200));
         if (track.getPictureBytes() != null) {
             try {
-
-                coverLabel.setIcon(ImageInflater.loadImage(track.getPictureBytes(), 250, 250));
+                coverLabel.setIcon(ImageInflater.loadImage(track.getPictureBytes(), 200, 200));
                 imageResize.pushLabelBytes(track.getPictureBytes(), coverLabel);
             } catch (Exception ignored) {
             }

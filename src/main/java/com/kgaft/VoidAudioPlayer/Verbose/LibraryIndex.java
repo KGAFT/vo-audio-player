@@ -31,7 +31,7 @@ public class LibraryIndex {
     private Dao<Track, Long> trackDao;
     private Dao<Album, Long> albumDao;
     private Dao<Artist, Long> artistDao;
-
+    private Dao<IndexedDirectory, Long> indexedDirectoryDao;
     public static LibraryIndex getInstance() {
         return new LibraryIndex(getConnection());
     }
@@ -45,6 +45,7 @@ public class LibraryIndex {
             trackDao = DaoManager.createDao(connection, Track.class);
             albumDao = DaoManager.createDao(connection, Album.class);
             artistDao = DaoManager.createDao(connection, Artist.class);
+           // indexedDirectoryDao = DaoManager.createDao(connection, IndexedDirectory.class);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
