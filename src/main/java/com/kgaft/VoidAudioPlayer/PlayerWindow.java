@@ -31,7 +31,7 @@ public class PlayerWindow extends JFrame implements IOnAlbumSelected, ActionList
         this.albumList = albums;
         trackPanel = new TrackPanel(albumList.getFirst().getTracks().stream().filter(t -> true).findFirst().get());
         albumListPanel = new AlbumListPanel(albumList);
-        setSize(800, 600);
+        setSize(1280, 720);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setLayout(new BorderLayout());
         add(trackPanel, BorderLayout.CENTER);
@@ -84,7 +84,10 @@ public class PlayerWindow extends JFrame implements IOnAlbumSelected, ActionList
             firstLoad = false;
         }
         if (track.getOffsetMs() != 0) {
-            playerPanel.seekTrack(((float) track.getOffsetMs()) / ((float) currentAlbum.getDuration()));
+            float offsetMs = track.getOffsetMs();
+            float durationMs = track.getDurationMs();
+            float offset = (offsetMs/durationMs);
+            playerPanel.seekTrack(offset);
         }
         remove(trackPanel);
         trackPanel = new TrackPanel(track);

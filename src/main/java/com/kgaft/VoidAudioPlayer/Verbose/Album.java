@@ -18,7 +18,7 @@ public class Album {
     private String artist = "";
     @DatabaseField(dataType = com.j256.ormlite.field.DataType.BYTE_ARRAY)
     private byte[] cover;
-    @DatabaseField(canBeNull = false)
+    @DatabaseField(canBeNull = false, unique = true)
     private String name = "";
     @ForeignCollectionField(eager = false)
     private Collection<Track> tracks;
@@ -42,6 +42,14 @@ public class Album {
 
     public Album() {
         this.tracks = new ArrayList<>();
+    }
+
+    public long getId() {
+        return id;
+    }
+
+    public void setId(long id) {
+        this.id = id;
     }
 
     public String getArtist() {
@@ -86,9 +94,12 @@ public class Album {
 
     public long getDuration() {
         if (duration == 0) {
+            long curDur = 0;
             for (Track track : tracks) {
-                duration += track.getDurationMs();
+                curDur += track.getDurationMs();
             }
+            duration = curDur;
+            return curDur;
         }
         return duration;
     }

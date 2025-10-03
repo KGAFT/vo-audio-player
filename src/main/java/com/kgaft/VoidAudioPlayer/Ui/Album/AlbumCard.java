@@ -25,7 +25,7 @@ public class AlbumCard extends JPanel {
 
         add(coverLabel, BorderLayout.CENTER);
         verbosePanel = new JPanel();
-        verbosePanel.setLayout(new FlowLayout());
+        verbosePanel.setLayout(new BoxLayout(verbosePanel, BoxLayout.Y_AXIS));
         titleLabel = new JLabel(album.getName());
         artistLabel = new JLabel(album.getArtist());
         verbosePanel.add(titleLabel);

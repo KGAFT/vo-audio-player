@@ -177,4 +177,15 @@ public class Track {
     public void setOverallBitrate(int overallBitrate) {
         this.overallBitrate = overallBitrate;
     }
+
+    @Override
+    public boolean equals(Object obj) {
+        if(obj.getClass() == this.getClass()){
+            Track track = (Track) obj;
+            if(track.getPath().equals(this.path) &&track.name.equals(this.name) && track.albumName.equals(this.albumName) && track.artistName.equals(this.artistName)  && track.genre.equals(this.genre)){
+                return true;
+            }
+        }
+        return false;
+    }
 }

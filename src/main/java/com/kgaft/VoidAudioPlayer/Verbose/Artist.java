@@ -12,7 +12,7 @@ import java.util.List;
 public class Artist {
     @DatabaseField(generatedId = true)
     private long id;
-    @DatabaseField(canBeNull = false)
+    @DatabaseField(canBeNull = false, unique = true)
     private String name;
     @ForeignCollectionField(eager = false)
     private Collection<Album> albums;

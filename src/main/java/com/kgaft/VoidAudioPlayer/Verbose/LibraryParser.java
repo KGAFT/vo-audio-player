@@ -131,12 +131,12 @@ public class LibraryParser {
                 Track baseTrack = Track.getTrackInfo(musicFile.getAbsolutePath());
                 for (int i = 0; i < cueFile.getTracks().size(); i++) {
                     CueTrackInfo info = cueFile.getTracks().get(i);
-                    CueTrackIndex index2 = getIndex(info.getIndexes(), true);
+                    CueTrackIndex index2 = getIndex(info.getIndexes());
                     long offset = (index2.getMinutes() * 60L + index2.getSeconds()) * 1000;
                     long duration = 0;
                     if (i != cueFile.getTracks().size() - 1) {
                         CueTrackInfo info2 = cueFile.getTracks().get(i + 1);
-                        CueTrackIndex endIndex = getIndex(info2.getIndexes(), false);
+                        CueTrackIndex endIndex = getIndex(info2.getIndexes());
                         duration = (endIndex.getMinutes() * 60L + endIndex.getSeconds()) * 1000 - offset;
                     } else {
                         duration = baseTrack.getDurationMs() - offset;
@@ -233,12 +233,15 @@ public class LibraryParser {
         return null;
     }
 
-    public static CueTrackIndex getIndex(Map<Integer, CueTrackIndex> indexes, boolean isEnd) {
+    public static CueTrackIndex getIndex(Map<Integer, CueTrackIndex> indexes) {
         int index = 1;
         CueTrackIndex index2 = indexes.get(index);
+        if(index2 == null) {
+            index = 0;
+        }
         while (index2 == null) {
-            index++;
             index2 = indexes.get(index);
+            index++;
         }
         return index2;
     }
