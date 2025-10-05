@@ -59,6 +59,7 @@ public class ImageResizer implements ComponentListener {
             button.setPreferredSize(new Dimension(targetExtent.width, targetExtent.height));
             button.repaint();
             button.invalidate();
+            button.validate();
         });
         labelBytes.forEach((imageBytes, label) -> {
             Icon icon = ImageInflater.loadImage(imageBytes, targetExtent.width, targetExtent.height);
@@ -66,6 +67,7 @@ public class ImageResizer implements ComponentListener {
             label.setPreferredSize(new Dimension(targetExtent.width, targetExtent.height));
             label.repaint();
             label.invalidate();
+            label.validate();
         });
     }
 

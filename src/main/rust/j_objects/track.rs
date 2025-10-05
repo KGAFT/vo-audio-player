@@ -317,7 +317,6 @@ impl Track {
             Ok(f) => f,
             Err(_) => return Self::empty_track(path, env),
         };
-
         // Require an ID3 tag
         let tag: &Tag = match dsf.id3_tag() {
             Some(t) => t,

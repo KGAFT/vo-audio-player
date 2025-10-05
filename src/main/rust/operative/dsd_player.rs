@@ -1,9 +1,11 @@
 //There must be dsd player, with ability to play dsd without pcm conversion
 //But asio is hard af, also needed UAC2 for linux/android
 
-pub struct DsdPlayer{
+pub struct DsdPlayer {
 
 }
+
+
 
 impl DsdPlayer{
     pub fn new() -> Self{

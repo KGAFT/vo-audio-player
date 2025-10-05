@@ -41,7 +41,7 @@ public class AlbumInfoPanel extends JPanel implements ComponentListener {
     private JButton backButton;
     protected IOnTrackSelected onTrackSelected;
     private IconResizer iconResizer = new IconResizer(0.05f, 0.05f, ResizerWorkMode.USE_MINIMUM);
-    private ImageResizer imageResizer = new ImageResizer(0.6f, 0.6f, ResizerWorkMode.USE_MINIMUM);
+    private ImageResizer imageResizer = new ImageResizer(0.2f, 0.2f, ResizerWorkMode.USE_MINIMUM);
     public AlbumInfoPanel(Album album) {
         albumCover = new JLabel();
         albumNameLabel = new JLabel(album.getName());

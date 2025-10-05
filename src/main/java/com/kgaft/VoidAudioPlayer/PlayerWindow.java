@@ -32,7 +32,7 @@ public class PlayerWindow extends JFrame implements IOnAlbumSelected, ActionList
         this.albumList = albums;
         trackPanel = new TrackPanel(albumList.get(36).getTracks().stream().filter(t -> true).findFirst().get());
         albumListPanel = new AlbumListPanel(albumList);
-        setSize(1280, 720);
+        setSize(900, 720);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setLayout(new BorderLayout());
         add(trackPanel, BorderLayout.CENTER);
