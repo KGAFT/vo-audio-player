@@ -1,26 +1,33 @@
-use byteorder::{LittleEndian, ReadBytesExt};
-use std::fs::File;
-use std::io::{self, Read, Seek, SeekFrom};
-use std::ptr;
+use byteorder::{BigEndian, LittleEndian, ReadBytesExt};
+use std::io::ErrorKind;
+use std::{
+    fs::File,
+    io::{self, Read, Seek, SeekFrom},
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicBool, Ordering},
+    },
+    thread,
+    time::Duration,
+};
 
-
-extern crate alsa_sys as alsa;
-
-#[derive(Debug)]
-struct DSDFormat {
-    sampling_rate: u32,
-    num_channels: u32,
-    total_samples: u64,
-    is_lsb_first: bool,
+#[derive(Debug, Clone)]
+pub struct DSDFormat {
+    pub sampling_rate: u32,
+    pub num_channels: u32,
+    pub total_samples: u64,
+    pub is_lsb_first: bool,
 }
 
-trait DSDReader {
+pub trait DSDReader {
     fn open(&mut self, format: &mut DSDFormat) -> io::Result<()>;
     fn read(&mut self, data: &mut [&mut [u8]], bytes_per_channel: usize) -> io::Result<usize>;
     fn seek_percent(&mut self, percent: f64) -> io::Result<()>;
     fn seek_samples(&mut self, sample_index: u64) -> io::Result<()>;
 }
-
+//
+// ---------- DSF Reader ----------
+//
 struct DSFReader {
     file: File,
     buf: Vec<u8>,
@@ -194,242 +201,129 @@ static BIT_REVERSE_TABLE: [u8; 256] = [
     0x07,0x87,0x47,0xc7,0x27,0xa7,0x67,0xe7,0x17,0x97,0x57,0xd7,0x37,0xb7,0x77,0xf7,
     0x0f,0x8f,0x4f,0xcf,0x2f,0xaf,0x6f,0xef,0x1f,0x9f,0x5f,0xdf,0x3f,0xbf,0x7f,0xff,
 ];
-
-
-fn main() -> io::Result<()> {
-    let filename = "/home/kgaft/TarBalls/sacd_extract/Dangerous/09 - Who Is It.dsf";
-
-    let mut reader = DSFReader::new(filename).unwrap();
-    let mut format = DSDFormat {
-        sampling_rate: 0,
-        num_channels: 0,
-        total_samples: 0,
-        is_lsb_first: false,
-    };
-    reader.open(&mut format).unwrap();
-
-    println!("DSD Format:");
-    println!("  sampling rate: {}", format.sampling_rate);
-    println!("  num channels:  {}", format.num_channels);
-    println!(
-        "  lsb first?:    {}",
-        if format.is_lsb_first { "yes" } else { "no" }
-    );
-    println!("  total samples: {}", format.total_samples);
-
-    if format.num_channels != 2 {
-        println!("not stereo");
-        std::process::exit(1);
-    }
-
-    let mut alsa_buffer_size = 8192 * 4usize;
-    let blocksize = alsa_buffer_size / format.num_channels as usize;
-
-    // per-channel buffers
-    let mut buf_left = vec![0u8; blocksize];
-    let mut buf_right = vec![0u8; blocksize];
-    let mut buf_slices: [&mut [u8]; 2] = [buf_left.as_mut_slice(), buf_right.as_mut_slice()];
-
-    unsafe {
-        let mut err: i32 = 0;
-        let mut playback_handle: *mut alsa::snd_pcm_t = ptr::null_mut();
-        let mut hw_params: *mut alsa::snd_pcm_hw_params_t = ptr::null_mut();
-
-        // prepare pcm buffer (interleaved)
-        let mut pcm = vec![0u8; alsa_buffer_size];
-
-        // work buffers halves similar to C++ (not strictly necessary because we allocated buf slices)
-        let mut work0 = vec![0u8; alsa_buffer_size >> 1];
-        let mut work1 = vec![0u8; alsa_buffer_size >> 1];
-        let mut work_slices: [&mut [u8]; 2] = [work0.as_mut_slice(), work1.as_mut_slice()];
-
-        // open device (hw:2,0 as in original) - you may want to change the device string
-        let device = std::ffi::CString::new("hw:2,0").unwrap();
-        err = alsa::snd_pcm_open(
-            &mut playback_handle,
-            device.as_ptr(),
-            alsa::SND_PCM_STREAM_PLAYBACK,
-            0,
-        );
-        if err < 0 {
-            eprintln!("cannot open audio device: {}", err);
-            return Ok(());
-        }
-
-        if (alsa::snd_pcm_hw_params_malloc)(&mut hw_params) < 0 {
-            eprintln!("cannot allocate hardware parameter structure");
-            if !playback_handle.is_null() {
-                alsa::snd_pcm_close(playback_handle);
-            }
-            return Ok(());
-        }
-        if alsa::snd_pcm_hw_params_any(playback_handle, hw_params) < 0 {
-            eprintln!("cannot initialize hardware parameter structure");
-            goto_close(playback_handle, hw_params);
-            return Ok(());
-        }
-        if alsa::snd_pcm_hw_params_set_access(
-            playback_handle,
-            hw_params,
-            alsa::SND_PCM_ACCESS_RW_INTERLEAVED,
-        ) < 0
-        {
-            eprintln!("cannot set access type");
-            goto_close(playback_handle, hw_params);
-            return Ok(());
-        }
-
-        // set rate to sampling_rate / 8 / 4 as in original (because in DSD->DSD_U32_BE conversion)
-        let rate = (format.sampling_rate / 8 / 4) as u32;
-        if alsa::snd_pcm_hw_params_set_rate(playback_handle, hw_params, rate, 0) < 0 {
-            eprintln!("cannot set sample rate");
-            goto_close(playback_handle, hw_params);
-            return Ok(());
-        }
-        if alsa::snd_pcm_hw_params_set_channels(
-            playback_handle,
-            hw_params,
-            format.num_channels as u32,
-        ) < 0
-        {
-            eprintln!("cannot set channel count");
-            goto_close(playback_handle, hw_params);
-            return Ok(());
-        }
-        // set DSD format constant
-        if alsa::snd_pcm_hw_params_set_format(
-            playback_handle,
-            hw_params,
-            alsa::SND_PCM_FORMAT_DSD_U32_BE,
-        ) < 0
-        {
-            eprintln!("cannot set sample format");
-            goto_close(playback_handle, hw_params);
-            return Ok(());
-        }
-
-        let mut frames: alsa::snd_pcm_uframes_t =
-            (alsa_buffer_size / format.num_channels as usize / 4) as alsa::snd_pcm_uframes_t;
-        let mut dir: i32 = 0;
-        alsa::snd_pcm_hw_params_set_period_size_near(
-            playback_handle,
-            hw_params,
-            &mut frames,
-            &mut dir,
-        );
-        // set hw params
-        if alsa::snd_pcm_hw_params(playback_handle, hw_params) < 0 {
-            eprintln!("cannot set parameters");
-            goto_close(playback_handle, hw_params);
-            return Ok(());
-        }
-        alsa::snd_pcm_hw_params_free(hw_params);
-        if alsa::snd_pcm_prepare(playback_handle) < 0 {
-            eprintln!("cannot prepare audio interface for use");
-            goto_close(playback_handle, ptr::null_mut());
-            return Ok(());
-        }
-        let mut index = 0;
-
-        // main loop: read, convert, write
-        
-        reader.seek_percent(0.1).expect("failed to seek");
-        
-        loop {
-            let bytes = match reader.read(&mut work_slices, alsa_buffer_size / format.num_channels as usize) {
-                Ok(b) => b,
-                Err(_) => { eprintln!("read error"); break; }
-            };
-            if bytes == 0 { break; }
-
-            let mut i = 0usize;
-            let l = &work_slices[0];
-            let r = &work_slices[1];
-
-            if format.is_lsb_first {
-                // bit reverse per byte
-                let mut j = 0usize;
-                while j + 3 < bytes {
-                    pcm[i + 0] = BIT_REVERSE_TABLE[l[j + 0] as usize];
-                    pcm[i + 1] = BIT_REVERSE_TABLE[l[j + 1] as usize];
-                    pcm[i + 2] = BIT_REVERSE_TABLE[l[j + 2] as usize];
-                    pcm[i + 3] = BIT_REVERSE_TABLE[l[j + 3] as usize];
-
-                    pcm[i + 4] = BIT_REVERSE_TABLE[r[j + 0] as usize];
-                    pcm[i + 5] = BIT_REVERSE_TABLE[r[j + 1] as usize];
-                    pcm[i + 6] = BIT_REVERSE_TABLE[r[j + 2] as usize];
-                    pcm[i + 7] = BIT_REVERSE_TABLE[r[j + 3] as usize];
-
-                    i += 8;
-                    j += 4;
-                }
-            } else {
-                let mut j = 0usize;
-                while j + 3 < bytes {
-                    pcm[i + 0] = l[j + 0];
-                    pcm[i + 1] = l[j + 1];
-                    pcm[i + 2] = l[j + 2];
-                    pcm[i + 3] = l[j + 3];
-
-                    pcm[i + 4] = r[j + 0];
-                    pcm[i + 5] = r[j + 1];
-                    pcm[i + 6] = r[j + 2];
-                    pcm[i + 7] = r[j + 3];
-
-                    i += 8;
-                    j += 4;
-                }
-            }
-
-            // write frames: bytes / 4 (32-bit samples)
-            let write_frames = (bytes / 4) as i64;
-
-            let ptr_pcm = pcm.as_ptr() as *const std::ffi::c_void;
-            let written = alsa::snd_pcm_writei(
-                playback_handle,
-                ptr_pcm,
-                write_frames as alsa::snd_pcm_uframes_t,
-            );
-            if written == -77 {
-                eprintln!("cannot write audio frame EBADF");
-                break;
-            }
-            if written == -32 {
-                eprintln!("cannot write audio frame EPIPE");
-                break;
-            }
-            if written == -86 {
-                eprintln!("cannot write audio frame ESTRPIPE");
-                break;
-            }
-            if written != write_frames as i64 {
-                eprintln!(
-                    "write to audio interface failed: wrote {} expected {}",
-                    written, write_frames
-                );
-                break;
-            }
-            index += 1;
-        }
-
-        println!("OK");
-
-        if !playback_handle.is_null() {
-            alsa::snd_pcm_close(playback_handle);
-        }
-    }
-
-    Ok(())
+pub enum ReaderType {
+    DSF(DSFReader)
 }
 
-unsafe fn goto_close(
-    playback_handle: *mut alsa::snd_pcm_t,
-    hw_params: *mut alsa::snd_pcm_hw_params_t,
-) {
-    if !hw_params.is_null() {
-        alsa::snd_pcm_hw_params_free(hw_params);
+pub struct DSDPlayer {
+    reader: Arc<Mutex<ReaderType>>,
+    format: DSDFormat,
+    stop_flag: Arc<AtomicBool>,
+    pause_flag: Arc<AtomicBool>,
+}
+
+impl DSDPlayer {
+    pub fn open(path: &str) -> io::Result<Self> {
+        let mut f = File::open(path)?;
+        let mut header = [0u8; 4];
+        f.read_exact(&mut header)?;
+        f.seek(SeekFrom::Start(0))?;
+
+        let mut format = DSDFormat {
+            sampling_rate: 0,
+            num_channels: 0,
+            total_samples: 0,
+            is_lsb_first: true,
+        };
+
+        if &header == b"DSD " {
+            let mut r = DSFReader::new(path)?;
+            r.open(&mut format)?;
+            Ok(Self {
+                reader: Arc::new(Mutex::new(ReaderType::DSF(r))),
+                format,
+                stop_flag: Arc::new(AtomicBool::new(false)),
+                pause_flag: Arc::new(AtomicBool::new(false)),
+            })
+        } else {
+            Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Unknown DSD file type",
+            ))
+        }
     }
-    if !playback_handle.is_null() {
-        alsa::snd_pcm_close(playback_handle);
+
+    pub fn start_playback(&self) -> thread::JoinHandle<()> {
+        let reader = Arc::clone(&self.reader);
+        let fmt = self.format.clone();
+        let stop_flag = Arc::clone(&self.stop_flag);
+        let pause_flag = Arc::clone(&self.pause_flag);
+        let num_channels = self.format.num_channels;
+        thread::spawn(move || unsafe {
+            use alsa_sys::*;
+            let mut handle: *mut snd_pcm_t = std::ptr::null_mut();
+            let pcm_name = b"default\0".as_ptr() as *const i8;
+
+            snd_pcm_open(&mut handle, pcm_name, SND_PCM_STREAM_PLAYBACK, 0);
+            snd_pcm_set_params(
+                handle,
+                SND_PCM_FORMAT_S32_LE,
+                SND_PCM_ACCESS_RW_INTERLEAVED,
+                fmt.num_channels as u32,
+                fmt.sampling_rate,
+                1,
+                500_000,
+            );
+
+            let mut buf = vec![0u8; 4096];
+            while !stop_flag.load(Ordering::SeqCst) {
+                if pause_flag.load(Ordering::SeqCst) {
+                    thread::sleep(Duration::from_millis(20));
+                    continue;
+                }
+
+                let mut lock = reader.lock().unwrap();
+                let buff_len = buf.len();
+                let n = match &mut *lock {
+                    ReaderType::DSF(r) => r.read(&mut [buf.as_mut_slice()], buff_len/num_channels as usize),
+                };
+                drop(lock);
+
+                let n = match n {
+                    Ok(v) if v > 0 => v,
+                    _ => break,
+                };
+
+                let ptr = buf.as_ptr() as *const std::ffi::c_void;
+                let frames = (n / 4) as u64;
+                let wrote = snd_pcm_writei(handle, ptr, frames);
+                if wrote < 0 {
+                    snd_pcm_prepare(handle);
+                }
+            }
+
+            snd_pcm_close(handle);
+        })
     }
+
+    pub fn pause(&self) {
+        self.pause_flag.store(true, Ordering::SeqCst);
+    }
+
+    pub fn resume(&self) {
+        self.pause_flag.store(false, Ordering::SeqCst);
+    }
+
+    pub fn stop(&self) {
+        self.stop_flag.store(true, Ordering::SeqCst);
+    }
+}
+
+fn main() -> io::Result<()> {
+    let player = DSDPlayer::open("/mnt/files2/Music/test.dsf")?;
+    println!("Loaded format: {:?}", player.format);
+    let handle = player.start_playback();
+
+    thread::sleep(Duration::from_secs(5));
+    println!("Pausing...");
+    player.pause();
+    thread::sleep(Duration::from_secs(2));
+    println!("Resuming...");
+    player.resume();
+    thread::sleep(Duration::from_secs(5));
+    println!("Stopping...");
+    player.stop();
+
+    handle.join().unwrap();
+    Ok(())
 }
