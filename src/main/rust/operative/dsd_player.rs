@@ -3,7 +3,8 @@
 
 use crate::operative::dsd_readers;
 use crate::operative::dsd_readers::{DSDFormat, DSDReader};
-use std::ffi::CString;
+use alsa_sys::{SND_PCM_NONBLOCK, SND_PCM_STREAM_PLAYBACK, snd_pcm_open};
+use std::ffi::{CStr, CString, c_char, c_void};
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering::Relaxed;
 use std::thread::sleep;
@@ -126,6 +127,74 @@ pub struct DsdPlayer {
 }
 
 impl DsdPlayer {
+    pub unsafe fn support_dsd(device_name: *const c_char) -> bool {
+        let mut handle: *mut alsa::snd_pcm_t = std::ptr::null_mut();
+        let mut params: *mut alsa::snd_pcm_hw_params_t = std::ptr::null_mut();
+        let mut err = alsa::snd_pcm_open(
+            &mut handle,
+            device_name,
+            SND_PCM_STREAM_PLAYBACK,
+            SND_PCM_NONBLOCK,
+        );
+        if err < 0 {
+            eprintln!(
+                "Failed to open device: {}",
+                CString::from(CStr::from_ptr(alsa::snd_strerror(err)))
+                    .to_str()
+                    .unwrap()
+            );
+            return false;
+        }
+        alsa::snd_pcm_hw_params_malloc(&mut params);
+        alsa::snd_pcm_hw_params_any(handle, params);
+        let mut supported = false;
+        if alsa::snd_pcm_hw_params_test_format(handle, params, alsa::SND_PCM_FORMAT_DSD_U32_BE) == 0
+        {
+            supported = true;
+        }
+        alsa::snd_pcm_hw_params_free(params);
+        alsa::snd_pcm_close(handle);
+        supported
+    }
+
+    pub fn enumerate_supported_devices() -> Vec<(CString, CString)> {
+        unsafe {
+            let pcm_const = CString::new("pcm").unwrap();
+            let name_const = CString::new("NAME").unwrap();
+            let desc_const = CString::new("DESC").unwrap();
+
+            let mut devices_raw: *mut *mut c_void = std::ptr::null_mut();
+            let mut err = alsa::snd_device_name_hint(-1, pcm_const.as_ptr(), &mut devices_raw);
+            if err != 0 {
+                eprintln!(
+                    "Error getting device hints: {}\n",
+                    CString::from(CStr::from_ptr(alsa::snd_strerror(err)))
+                        .to_str()
+                        .unwrap()
+                );
+                return vec![];
+            }
+            let mut res = Vec::new();
+            let mut n = devices_raw;
+            let mut iter = *n;
+            while !iter.is_null() {
+                let name = alsa::snd_device_name_get_hint(iter, name_const.as_ptr());
+                let desc = alsa::snd_device_name_get_hint(iter, desc_const.as_ptr());
+                let name_cstr = CStr::from_ptr(name);
+                let desc_cstr = CStr::from_ptr(desc);
+                if !name.is_null() {
+                    if Self::support_dsd(name) {
+                        eprintln!("cur support: {},{}", name_cstr.to_str().unwrap(), desc_cstr.to_str().unwrap());
+                        res.push((CString::from_raw(name), CString::from_raw(desc)));
+                    }
+                }
+                n = n.offset(1);
+                iter = *n;
+            }
+            res
+        }
+    }
+
     pub fn new(filename: &str, device_name: &str) -> Self {
         let mut format = DSDFormat {
             sampling_rate: 0,
@@ -150,7 +219,7 @@ impl DsdPlayer {
             std::process::exit(1);
         }
 
-       // let mut alsa_buffer_size = 8192 * 4usize;
+        // let mut alsa_buffer_size = 8192 * 4usize;
         let mut alsa_buffer_size = 8192 * (format.sampling_rate / 2822400) as usize;
         let blocksize = alsa_buffer_size / format.num_channels as usize;
 
@@ -319,6 +388,9 @@ impl DsdPlayer {
 
     fn setup_params(&mut self) {
         unsafe {
+            if !self.hw_params.is_null() {
+                alsa::snd_pcm_hw_params_free(self.hw_params);
+            }
             if alsa::snd_pcm_hw_params_malloc(&mut self.hw_params) < 0 {
                 panic!("cannot allocate hardware parameter structure");
             }
