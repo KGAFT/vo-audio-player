@@ -1,31 +1,22 @@
-use std::io;
-use std::io::Write;
-use std::ptr::null;
-use std::sync::atomic::AtomicBool;
-use std::sync::atomic::Ordering::Relaxed;
 use gst::prelude::*;
 use gstreamer as gst;
-use gstreamer::{Bus, MessageView, SeekFlags};
+use gstreamer::MessageView;
+use std::io;
+use std::io::Write;
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering::Relaxed;
 use std::time::Duration;
-use gstreamer::bus::Iter;
 
-
-pub struct AudioPlayer{
+pub struct AudioPlayer {
     playbin: gst::Element,
-    playing: AtomicBool
+    playing: AtomicBool,
 }
 
-unsafe impl Send for AudioPlayer{
+unsafe impl Send for AudioPlayer {}
 
-}
-
-unsafe impl Sync for AudioPlayer{
-
-}
-
+unsafe impl Sync for AudioPlayer {}
 
 impl AudioPlayer {
-
     pub fn new() -> Self {
         gst::init().expect("Failed to initialize GStreamer");
 
@@ -39,7 +30,63 @@ impl AudioPlayer {
             .build()
             .unwrap();
 
-        Self { playbin, playing: AtomicBool::new(false) }
+        Self {
+            playbin,
+            playing: AtomicBool::new(false),
+        }
+    }
+
+    pub fn list_output_devices() -> Vec<(String, String)> {
+        gst::init().ok(); // safe to call multiple times
+        let monitor = gst::DeviceMonitor::new();
+        monitor.add_filter(Some("Audio/Sink"), None::<&gst::Caps>);
+
+        monitor.start().expect("Failed to start device monitor");
+        let devices = monitor.devices();
+        monitor.stop();
+
+        devices
+            .iter()
+            .filter_map(|dev| {
+                let name = dev.display_name();
+                let device_class = dev.device_class();
+                let device_str = dev
+                    .properties()
+                    .and_then(|props| {
+                        Some(
+                            props
+                                .get::<&str>("device.name")
+                                .ok()
+                                .unwrap_or("Unknown")
+                                .to_string(),
+                        )
+                    })
+                    .unwrap();
+                Some((name.to_string(), device_str))
+            })
+            .collect()
+    }
+
+    pub fn set_output_device(&self, device_name: &str) -> bool {
+        let monitor = gst::DeviceMonitor::new();
+        monitor.add_filter(Some("Audio/Sink"), None::<&gst::Caps>);
+        monitor.start().ok();
+
+        for dev in monitor.devices() {
+            let name = dev.display_name();
+            if name.contains(device_name) {
+                if let Ok(sink) = dev.create_element(None) {
+                    self.playbin.set_property("audio-sink", &sink);
+                    println!("Set audio device to: {}", name);
+                    monitor.stop();
+                    return true;
+                }
+            }
+        }
+
+        monitor.stop();
+        eprintln!("Could not find device matching '{}'", device_name);
+        false
     }
 
     /// Load a new file and set it up
@@ -88,10 +135,7 @@ impl AudioPlayer {
             }
             let pipeline = pipeline.unwrap();
             return pipeline
-                .seek_simple(
-                    gst::SeekFlags::FLUSH | gst::SeekFlags::KEY_UNIT,
-                    time,
-                )
+                .seek_simple(gst::SeekFlags::FLUSH | gst::SeekFlags::KEY_UNIT, time)
                 .is_ok();
         }
         self.play();
@@ -105,8 +149,7 @@ impl AudioPlayer {
 
     /// Get current playback volume (0.0 - 1.0)
     pub fn volume(&self) -> f64 {
-        self.playbin
-            .property::<f64>("volume")
+        self.playbin.property::<f64>("volume")
     }
 
     /// Stop playback (set to Null state)

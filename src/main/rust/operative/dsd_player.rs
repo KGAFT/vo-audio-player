@@ -3,13 +3,14 @@
 
 use crate::operative::dsd_readers;
 use crate::operative::dsd_readers::{DSDFormat, DSDReader};
-use alsa_sys::{SND_PCM_NONBLOCK, SND_PCM_STREAM_PLAYBACK, snd_pcm_open};
+use alsa_sys::{SND_PCM_NONBLOCK, SND_PCM_STREAM_PLAYBACK};
 use std::ffi::{CStr, CString, c_char, c_void};
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering::Relaxed;
 use std::thread::sleep;
 use std::time::Duration;
 use std::{io, ptr};
+use crate::util::semaphore::Semaphore;
 
 extern crate alsa_sys as alsa;
 
@@ -119,11 +120,13 @@ pub struct DsdPlayer {
     playback_handle: *mut alsa::snd_pcm_t,
     hw_params: *mut alsa::snd_pcm_hw_params_t,
     buffers: Buffers,
-    reader: Box<dyn DSDReader>,
+    reader: Option<Box<dyn DSDReader>>,
+    reader_semaphore: Semaphore,
     format: DSDFormat,
     current_device: CString,
     paused: AtomicBool,
     stoped: AtomicBool,
+    is_playing: AtomicBool,
 }
 
 impl DsdPlayer {
@@ -184,7 +187,11 @@ impl DsdPlayer {
                 let desc_cstr = CStr::from_ptr(desc);
                 if !name.is_null() {
                     if Self::support_dsd(name) {
-                        eprintln!("cur support: {},{}", name_cstr.to_str().unwrap(), desc_cstr.to_str().unwrap());
+                        eprintln!(
+                            "cur support: {},{}",
+                            name_cstr.to_str().unwrap(),
+                            desc_cstr.to_str().unwrap()
+                        );
                         res.push((CString::from_raw(name), CString::from_raw(desc)));
                     }
                 }
@@ -195,35 +202,9 @@ impl DsdPlayer {
         }
     }
 
-    pub fn new(filename: &str, device_name: &str) -> Self {
-        let mut format = DSDFormat {
-            sampling_rate: 0,
-            num_channels: 0,
-            total_samples: 0,
-            is_lsb_first: false,
-        };
-        let mut reader =
-            dsd_readers::open_dsd_auto(filename, &mut format).expect("Failed to open DSD");
-
-        println!("DSD Format:");
-        println!("  sampling rate: {}", format.sampling_rate);
-        println!("  num channels:  {}", format.num_channels);
-        println!(
-            "  lsb first?:    {}",
-            if format.is_lsb_first { "yes" } else { "no" }
-        );
-        println!("  total samples: {}", format.total_samples);
-
-        if format.num_channels != 2 {
-            println!("not stereo");
-            std::process::exit(1);
-        }
-
-        // let mut alsa_buffer_size = 8192 * 4usize;
-        let mut alsa_buffer_size = 8192 * (format.sampling_rate / 2822400) as usize;
-        let blocksize = alsa_buffer_size / format.num_channels as usize;
-
-        unsafe {
+    pub fn new(device_name: &str) -> Self {
+        unsafe{
+            let buffers = Buffers::new(1, 1);
             let mut err: i32 = 0;
             let mut playback_handle: *mut alsa::snd_pcm_t = ptr::null_mut();
             let mut hw_params: *mut alsa::snd_pcm_hw_params_t = ptr::null_mut();
@@ -238,33 +219,53 @@ impl DsdPlayer {
             if err < 0 {
                 panic!("cannot open audio device: {}", err);
             }
-            let buffers = Buffers::new(alsa_buffer_size, blocksize);
             let mut res = Self {
                 playback_handle,
                 hw_params,
                 buffers,
-                reader,
-                format,
+                reader: None,
+                format: DSDFormat::default(),
                 current_device: device,
                 paused: AtomicBool::new(false),
                 stoped: AtomicBool::new(false),
+                is_playing: AtomicBool::new(false),
+                reader_semaphore: Semaphore::new(1),
             };
             res.setup_params();
-            res.update_hw_params(&format, alsa_buffer_size);
             res
         }
     }
 
+    pub fn open(filename: &str, device_name: &str) -> Self {
+        let mut res = Self::new(device_name);
+        res.load_new_track(filename);
+        res
+    }
+
     pub fn get_current_position_percents(&self) -> f64 {
-        self.reader.get_position_percent()
+        if let Some(reader) = self.reader.as_ref() {
+            reader.get_position_percent()
+        } else {
+            0f64
+        }
+
     }
 
     pub fn pause(&self) {
         self.paused.store(true, Relaxed);
+        self.is_playing.store(false, Relaxed);
     }
 
     pub fn play(&self) {
         self.paused.store(false, Relaxed);
+    }
+
+    pub fn get_pos(&self) -> f64{
+        if let Some(reader) = self.reader.as_ref() {
+            reader.get_position_percent()
+        } else {
+            0f64
+        }
     }
 
     pub fn stop(&self) {
@@ -274,6 +275,10 @@ impl DsdPlayer {
                 alsa::snd_pcm_drain(self.playback_handle);
             }
         }
+    }
+
+    pub fn is_playing(&self) -> bool {
+        self.is_playing.load(Relaxed)
     }
 
     pub fn load_new_track(&mut self, filename: &str) {
@@ -286,21 +291,17 @@ impl DsdPlayer {
         };
         let mut reader =
             dsd_readers::open_dsd_auto(filename, &mut format).expect("Failed to open DSD");
+        let mut alsa_buffer_size = 8192 * (format.sampling_rate / 2822400) as usize;
+        let blocksize = alsa_buffer_size / format.num_channels as usize;
 
-        println!("DSD Format:");
-        println!("  sampling rate: {}", format.sampling_rate);
-        println!("  num channels:  {}", format.num_channels);
-        println!(
-            "  lsb first?:    {}",
-            if format.is_lsb_first { "yes" } else { "no" }
-        );
-        println!("  total samples: {}", format.total_samples);
+        let buffers = Buffers::new(alsa_buffer_size, blocksize);
+        self.buffers = buffers;
 
         if format.num_channels != 2 {
-            println!("not stereo");
+            eprintln!("not stereo");
             std::process::exit(1);
         }
-        self.reader = reader;
+        self.reader = Some(reader);
         if self.format.is_alsa_update_need(&format) {
             self.reprepare_alsa_sync();
         }
@@ -327,10 +328,21 @@ impl DsdPlayer {
     }
 
     pub fn seek(&mut self, percent: f64) -> Result<(), io::Error> {
-        self.reader.seek_percent(percent)
+        if let Some(reader) = self.reader.as_mut() {
+            self.reader_semaphore.acquire();
+            let res = reader.seek_percent(percent);
+            self.reader_semaphore.release();
+            res
+        } else {
+            Err(io::Error::last_os_error())
+        }
+
     }
 
     pub fn play_on_current_thread(&mut self) {
+        if self.reader.is_none() {
+            return;
+        }
         let mut alsa_buffer = vec![0u8; self.buffers.alsa_buffer_size()];
         loop {
             if self.stoped.load(Relaxed) {
@@ -340,19 +352,23 @@ impl DsdPlayer {
                 sleep(Duration::from_millis(100));
                 continue;
             }
+            self.is_playing.store(true, Relaxed);
             let alsa_buffer_size = self.buffers.alsa_buffer_size();
             let num_channels = self.format.num_channels;
             let mut work_slices = self.buffers.get_slice_for_reader();
+            self.reader_semaphore.acquire();
             let bytes = match self
-                .reader
+                .reader.as_mut().unwrap()
                 .read(&mut work_slices, alsa_buffer_size / num_channels as usize)
             {
                 Ok(b) => b,
                 Err(_) => {
+                    self.reader_semaphore.release();
                     eprintln!("read error");
                     break;
                 }
             };
+            self.reader_semaphore.release();
             if bytes == 0 {
                 break;
             }
@@ -411,8 +427,7 @@ impl DsdPlayer {
 
     fn update_hw_params(&mut self, format: &DSDFormat, alsa_buffer_size: usize) {
         unsafe {
-            let rate = (format.sampling_rate / 8 / 4);
-            //let rate = format.sampling_rate / 8;
+            let rate = format.sampling_rate / 8 / 4;
             if alsa::snd_pcm_hw_params_set_rate(
                 self.playback_handle.clone(),
                 self.hw_params.clone(),

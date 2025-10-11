@@ -4,7 +4,7 @@ import java.util.List;
 
 public class PlayerDsd{
     public static native List<String> enumerateSupportedDevices();
-    public static native long initializePlayer(int index);
+    public static native long initializePlayer(String deviceName);
     public static native void loadTrack(long handle, String path);
     public static native void playOnCurrentThread(long handle);
     public static native boolean seekTrack(long handle, float percent);

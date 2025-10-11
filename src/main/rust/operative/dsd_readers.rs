@@ -1,9 +1,9 @@
+use byteorder::{BigEndian, LittleEndian, ReadBytesExt};
 use std::fs::File;
 use std::io;
 use std::io::{Read, Seek, SeekFrom};
-use byteorder::{BigEndian, LittleEndian, ReadBytesExt};
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Copy, Clone, Eq, PartialEq, Default)]
 pub struct DSDFormat {
     pub sampling_rate: u32,
     pub num_channels: u32,
@@ -13,7 +13,8 @@ pub struct DSDFormat {
 
 impl DSDFormat {
     pub fn is_alsa_update_need(&self, other: &Self) -> bool {
-        return self.sampling_rate != other.sampling_rate || self.num_channels != other.num_channels;
+        return self.sampling_rate != other.sampling_rate
+            || self.num_channels != other.num_channels;
     }
 }
 
@@ -38,7 +39,10 @@ pub fn open_dsd_auto(path: &str, format: &mut DSDFormat) -> io::Result<Box<dyn D
             reader.open(format)?;
             Ok(Box::new(reader))
         }
-        _ => Err(io::Error::new(io::ErrorKind::InvalidData, "unknown DSD format")),
+        _ => Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "unknown DSD format",
+        )),
     }
 }
 
@@ -50,6 +54,7 @@ pub trait DSDReader {
     fn get_position_frames(&self) -> u64;
     fn get_position_percent(&self) -> f64;
 }
+
 
 pub struct DSFReader {
     file: File,
@@ -236,20 +241,19 @@ impl DSDReader for DSFReader {
     }
 }
 
-
 pub struct DFFReader {
     file: File,
     buf: Vec<u8>,
     ch: usize,
-    blocksize: usize,    // bytes per channel block we read at once
+    blocksize: usize, // bytes per channel block we read at once
     filled: usize,
     pos: usize,
-    total_samples: u64,  // frames per channel
-    read_samples: u64,   // bits read in total (like DSFReader)
+    total_samples: u64, // frames per channel
+    read_samples: u64,  // bits read in total (like DSFReader)
     data_start: u64,
     data_size: u64,
-    planar: bool,        // true => per-channel blocks (channel0 block, channel1 block, ...), false => interleaved
-    is_msb_first: bool,  // DFF often MSB-first
+    planar: bool, // true => per-channel blocks (channel0 block, channel1 block, ...), false => interleaved
+    is_msb_first: bool, // DFF often MSB-first
 }
 
 impl DFFReader {
@@ -272,10 +276,14 @@ impl DFFReader {
     }
 
     /// Switch layout if your file is interleaved
-    pub fn set_planar(&mut self, planar: bool) { self.planar = planar; }
+    pub fn set_planar(&mut self, planar: bool) {
+        self.planar = planar;
+    }
 
     /// Switch bit order manually if autodetection suggests different
-    pub fn set_msb_first(&mut self, is_msb_first: bool) { self.is_msb_first = is_msb_first; }
+    pub fn set_msb_first(&mut self, is_msb_first: bool) {
+        self.is_msb_first = is_msb_first;
+    }
 }
 
 impl DSDReader for DFFReader {
@@ -285,14 +293,20 @@ impl DSDReader for DFFReader {
         // FRM8 header
         self.file.read_exact(&mut ident)?;
         if &ident != b"FRM8" {
-            return Err(io::Error::new(io::ErrorKind::InvalidData, "not DFF (no FRM8)"));
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "not DFF (no FRM8)",
+            ));
         }
         // FRM8 size (big endian 64-bit)
         let _frm8_size = self.file.read_u64::<BigEndian>()?;
         // form type should be "DSD "
         self.file.read_exact(&mut ident)?;
         if &ident != b"DSD " {
-            return Err(io::Error::new(io::ErrorKind::InvalidData, "not DFF (form != 'DSD ')"));
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "not DFF (form != 'DSD ')",
+            ));
         }
 
         // iterate chunks until we find PROP and DSD
@@ -322,7 +336,10 @@ impl DSDReader for DFFReader {
                     // next should be "SND "
                     self.file.read_exact(&mut ident)?;
                     if &ident != b"SND " {
-                        return Err(io::Error::new(io::ErrorKind::InvalidData, "PROP missing SND"));
+                        return Err(io::Error::new(
+                            io::ErrorKind::InvalidData,
+                            "PROP missing SND",
+                        ));
                     }
                     // SND chunk size
                     let snd_size = self.file.read_u64::<BigEndian>()?;
@@ -356,7 +373,10 @@ impl DSDReader for DFFReader {
                                 let mut comp = [0u8; 4];
                                 self.file.read_exact(&mut comp)?;
                                 if &comp != b"DSD " {
-                                    return Err(io::Error::new(io::ErrorKind::InvalidData, "compressed DFF not supported"));
+                                    return Err(io::Error::new(
+                                        io::ErrorKind::InvalidData,
+                                        "compressed DFF not supported",
+                                    ));
                                 }
                                 let skip = sub_size as i64 - 4;
                                 if skip > 0 {
@@ -389,12 +409,23 @@ impl DSDReader for DFFReader {
         }
 
         if data_offset == 0 {
-            return Err(io::Error::new(io::ErrorKind::InvalidData, "DFF missing DSD chunk"));
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "DFF missing DSD chunk",
+            ));
         }
 
         // fill format
-        if let Some(fs) = sampling_rate { format.sampling_rate = fs; } else { format.sampling_rate = 2822400; }
-        if let Some(ch) = channels { format.num_channels = ch; } else { format.num_channels = 2; }
+        if let Some(fs) = sampling_rate {
+            format.sampling_rate = fs;
+        } else {
+            format.sampling_rate = 2822400;
+        }
+        if let Some(ch) = channels {
+            format.num_channels = ch;
+        } else {
+            format.num_channels = 2;
+        }
 
         // DFF typically uses MSB-first bit order; keep is_lsb_first false
         format.is_lsb_first = false;
@@ -509,7 +540,10 @@ impl DSDReader for DFFReader {
 
     fn seek_percent(&mut self, percent: f64) -> io::Result<()> {
         if percent < 0.0 || percent > 1.0 {
-            return Err(io::Error::new(io::ErrorKind::InvalidInput, "percent out of range"));
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "percent out of range",
+            ));
         }
         let target_sample = (self.total_samples as f64 * percent) as u64;
         self.seek_samples(target_sample)
@@ -523,7 +557,8 @@ impl DSDReader for DFFReader {
         // align to block boundary if planar, or to 1 byte if interleaved
         let aligned_bytes = if self.planar {
             // align to blocksize*ch boundary (same logic as DSF)
-            ((total_bytes) / ((self.blocksize * self.ch) as u64)) * ((self.blocksize * self.ch) as u64)
+            ((total_bytes) / ((self.blocksize * self.ch) as u64))
+                * ((self.blocksize * self.ch) as u64)
         } else {
             // interleaved: align to any byte
             total_bytes
@@ -537,12 +572,16 @@ impl DSDReader for DFFReader {
     }
 
     fn get_position_frames(&self) -> u64 {
-        if self.ch == 0 { return 0; }
+        if self.ch == 0 {
+            return 0;
+        }
         self.read_samples / (self.ch as u64)
     }
 
     fn get_position_percent(&self) -> f64 {
-        if self.total_samples == 0 { return 0.0; }
+        if self.total_samples == 0 {
+            return 0.0;
+        }
         (self.get_position_frames() as f64 / self.total_samples as f64).min(1.0)
     }
 }

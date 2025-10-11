@@ -7,8 +7,6 @@ use lofty::file::{AudioFile, TaggedFileExt};
 use lofty::tag::Accessor;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
-use std::fs::File;
-use std::io::BufReader;
 use std::path::{Path, PathBuf};
 
 #[derive(Serialize, Deserialize)]
@@ -110,12 +108,10 @@ impl Track {
         let int_fields = [
             ("year", year),
             ("sampleRate", sample_rate),
-            ("overallBitrate", overall_bitrate)
+            ("overallBitrate", overall_bitrate),
         ];
 
-        let long_fields = [
-            ("durationMs", duration),
-        ];
+        let long_fields = [("durationMs", duration)];
 
         for (field_name, value) in int_fields.iter() {
             env.set_field(track_obj.as_ref(), *field_name, "I", JValue::Int(*value))
@@ -243,17 +239,15 @@ impl Track {
         let track_obj2 = track_obj.as_ref();
         let mut env_copy = unsafe { env.unsafe_clone() };
         let mut get_string_field = |name: &str| -> jni::errors::Result<String> {
-            unsafe {
-                let jstr = env_copy
-                    .get_field(track_obj2, name, "Ljava/lang/String;")?
-                    .l()?;
-                if jstr.is_null() {
-                    Ok(String::new())
-                } else {
-                    Ok(env_copy
-                        .get_string(&jni::objects::JString::from(jstr))?
-                        .into())
-                }
+            let jstr = env_copy
+                .get_field(track_obj2, name, "Ljava/lang/String;")?
+                .l()?;
+            if jstr.is_null() {
+                Ok(String::new())
+            } else {
+                Ok(env_copy
+                    .get_string(&jni::objects::JString::from(jstr))?
+                    .into())
             }
         };
         let mut env_copy2 = unsafe { env.unsafe_clone() };
@@ -297,20 +291,6 @@ impl Track {
     }
 
     pub fn extract_dsd_info(path: &str, env: &mut JNIEnv) -> jobject {
-        let f_name = PathBuf::from(path)
-            .file_name()
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .to_string();
-
-        /*
-        // .dff or .dsd files → no metadata support
-        if f_name.ends_with(".dff") || f_name.ends_with(".dsd") {
-            return Self::empty_track(path, env);
-        }
-
-         */
 
         // Parse DSF file
         let dsf = match DsfFile::open(Path::new(path)) {
@@ -381,9 +361,7 @@ impl Track {
             ("overallBitrate", overall_bitrate),
         ];
 
-        let long_fields = [
-            ("durationMs", duration),
-        ];
+        let long_fields = [("durationMs", duration)];
 
         for (field_name, value) in int_fields.iter() {
             env.set_field(track_obj.as_ref(), *field_name, "I", JValue::Int(*value))
