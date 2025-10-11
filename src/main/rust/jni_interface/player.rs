@@ -1,9 +1,43 @@
 use crate::operative::audio_player::AudioPlayer;
 use jni::JNIEnv;
-use jni::objects::{JClass, JString};
-use jni::sys::{jboolean, jfloat, jlong};
+use jni::objects::{JClass, JString, JValue};
+use jni::sys::{jboolean, jfloat, jlong, jobject};
 use std::thread::sleep;
 use std::time::Duration;
+
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_Player_getDevices(
+    mut env: JNIEnv,
+    _class: JClass,
+) -> jobject {
+    let devices = AudioPlayer::list_output_devices();
+    let arraylist_class = env.find_class("java/util/ArrayList").unwrap();
+    let j_devices = env.new_object(arraylist_class, "()V", &[]).unwrap();
+    devices.iter().for_each(|device| {
+        let str = device.0.clone();
+        let j_string = env.new_string(str).unwrap();
+        env.call_method(
+            j_devices.as_ref(),
+            "add",
+            "(Ljava/lang/Object;)Z",
+            &[JValue::Object(&j_string)],
+        )
+        .unwrap();
+    });
+    j_devices.as_raw()
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_Player_setDevice(
+    mut env: JNIEnv,
+    _class: JClass,
+    handle: jlong,
+    device_name: JString,
+) {
+    let player = handle as *mut AudioPlayer;
+    let player = player.as_mut().unwrap();
+    player.set_output_device(env.get_string(&device_name).unwrap().to_str().unwrap());
+}
 
 #[unsafe(no_mangle)]
 pub unsafe extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_Player_initializePlayer(

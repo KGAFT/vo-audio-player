@@ -1,7 +1,11 @@
 package com.kgaft.VoidAudioPlayer.Native;
 
+import java.util.List;
+
 public class Player {
+    public static native List<String> getDevices();
     public static native long initializePlayer();
+    public static native void setDevice(long handle, String device);
     public static native void loadTrack(long handle, String path);
     public static native void pollEventsMain(long handle);
     public static native boolean seekTrack(long handle, float seconds);

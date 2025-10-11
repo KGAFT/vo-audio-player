@@ -29,6 +29,9 @@ public class PlayerPanel extends JPanel{
         manipulationsPanel.setLayout(new GridLayout(1, 3));
         playerHandle = Player.initializePlayer();
 
+        java.util.List<String> devices = Player.getDevices();
+        devices.forEach(System.out::println);
+
         Icon playIcon = IconInflater.loadIcon("icons/play.svg", size, size);
         Icon pauseIcon = IconInflater.loadIcon("icons/pause.svg", size, size);
         manipulationsPanel.setSize(width, height);
