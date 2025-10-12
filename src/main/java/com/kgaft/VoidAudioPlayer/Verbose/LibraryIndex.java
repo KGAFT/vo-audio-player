@@ -83,6 +83,7 @@ public class LibraryIndex {
         List<Artist> artistList = new ArrayList<>();
         List<Track> trackList = new ArrayList<>();
         albumList.forEach(album -> {
+            album.processDuration();
             if(album.getArtist()!=null && !album.getArtist().isEmpty()){
                 tryFindOrCreateArtist(album, artistList);
             }

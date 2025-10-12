@@ -37,6 +37,17 @@ pub extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_PlayerDsd_initializ
 }
 
 #[unsafe(no_mangle)]
+pub extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_PlayerDsd_destroyPlayer(
+    mut env: JNIEnv,
+    _class: JClass,
+    handle: jlong
+){
+    unsafe {
+        drop(Box::from_raw(handle as *mut DsdPlayer));
+    }
+}
+
+#[unsafe(no_mangle)]
 pub extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_PlayerDsd_loadTrack(
     mut env: JNIEnv,
     _class: JClass,

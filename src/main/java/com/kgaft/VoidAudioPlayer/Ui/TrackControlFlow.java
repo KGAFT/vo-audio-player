@@ -1,6 +1,7 @@
 package com.kgaft.VoidAudioPlayer.Ui;
 
 
+import com.kgaft.VoidAudioPlayer.Model.MPlayer;
 import com.kgaft.VoidAudioPlayer.Native.Player;
 
 import javax.swing.*;
@@ -18,11 +19,9 @@ public class TrackControlFlow extends JSlider implements Runnable {
     private volatile float posSkew = 0;
     private Thread controlThread;
     private boolean isRunning = false;
-    private long playerHandle;
 
-    public TrackControlFlow(long playerHandle) {
+    public TrackControlFlow() {
         super(0, 100, 0);
-        this.playerHandle = playerHandle;
         setLayout(new GridLayout(1, 1));
         addMouseListener(new MouseListener() {
             @Override
@@ -89,17 +88,16 @@ public class TrackControlFlow extends JSlider implements Runnable {
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
-            float trackLength = Player.getTrackLength(playerHandle);
-            float trackPos = Player.getTrackPos(playerHandle);
-            while (trackPos < trackLength && isRunning) {
+            float trackPos = MPlayer.getPosition();
+            while (trackPos < 1 && isRunning) {
                 try {
                     Thread.sleep(200);
                 } catch (InterruptedException e) {
                     throw new RuntimeException(e);
                 }
-                trackPos = Player.getTrackPos(playerHandle);
+                trackPos = MPlayer.getPosition();
                 if (trackPosUpdated && !userChangingPos) {
-                    Player.seekTrack(playerHandle, posSkew);
+                    MPlayer.seekTrack(posSkew);
                     trackPosUpdated = false;
                 } else if (!userChangingPos) {
                     try {
@@ -107,7 +105,7 @@ public class TrackControlFlow extends JSlider implements Runnable {
                     } catch (InterruptedException e) {
                         e.printStackTrace();
                     }
-                    setValue((int) (trackPos / trackLength * 100.0f));
+                    setValue((int) (trackPos * 100.0f));
                     invalidate();
                     sliderSemaphore.release();
                 }

@@ -35,6 +35,9 @@ public class Track {
     private long offsetMs;
     @DatabaseField
     private long durationMs;
+    @DatabaseField
+    private long albumDurationMs;
+
     @DatabaseField(foreign = true, foreignAutoRefresh = true, foreignAutoCreate = true)
     private Album albumObject;
 
@@ -108,6 +111,14 @@ public class Track {
 
     public void setDurationMs(long durationMs) {
         this.durationMs = durationMs;
+    }
+
+    public long getAlbumDurationMs() {
+        return albumDurationMs;
+    }
+
+    public void setAlbumDurationMs(long albumDurationMs) {
+        this.albumDurationMs = albumDurationMs;
     }
 
     public String getPath() {

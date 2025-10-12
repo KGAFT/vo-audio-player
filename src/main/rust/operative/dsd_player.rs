@@ -1,8 +1,10 @@
 //There must be dsd player, with ability to play dsd without pcm conversion
 //But asio is hard af, also needed UAC2 for linux/android
-
+#[cfg(target_os = "linux")]
 use crate::operative::dsd_readers;
 use crate::operative::dsd_readers::{DSDFormat, DSDReader};
+use crate::util::semaphore::Semaphore;
+#[cfg(target_os = "linux")]
 use alsa_sys::{SND_PCM_NONBLOCK, SND_PCM_STREAM_PLAYBACK};
 use std::ffi::{CStr, CString, c_char, c_void};
 use std::sync::atomic::AtomicBool;
@@ -10,10 +12,9 @@ use std::sync::atomic::Ordering::Relaxed;
 use std::thread::sleep;
 use std::time::Duration;
 use std::{io, ptr};
-use crate::util::semaphore::Semaphore;
-
+#[cfg(target_os = "linux")]
 extern crate alsa_sys as alsa;
-
+#[cfg(target_os = "linux")]
 static BIT_REVERSE_TABLE: [u8; 256] = [
     0x00, 0x80, 0x40, 0xc0, 0x20, 0xa0, 0x60, 0xe0, 0x10, 0x90, 0x50, 0xd0, 0x30, 0xb0, 0x70, 0xf0,
     0x08, 0x88, 0x48, 0xc8, 0x28, 0xa8, 0x68, 0xe8, 0x18, 0x98, 0x58, 0xd8, 0x38, 0xb8, 0x78, 0xf8,
@@ -32,7 +33,7 @@ static BIT_REVERSE_TABLE: [u8; 256] = [
     0x07, 0x87, 0x47, 0xc7, 0x27, 0xa7, 0x67, 0xe7, 0x17, 0x97, 0x57, 0xd7, 0x37, 0xb7, 0x77, 0xf7,
     0x0f, 0x8f, 0x4f, 0xcf, 0x2f, 0xaf, 0x6f, 0xef, 0x1f, 0x9f, 0x5f, 0xdf, 0x3f, 0xbf, 0x7f, 0xff,
 ];
-
+#[cfg(target_os = "linux")]
 struct Buffers {
     work0: Vec<u8>,
     work1: Vec<u8>,
@@ -203,7 +204,7 @@ impl DsdPlayer {
     }
 
     pub fn new(device_name: &str) -> Self {
-        unsafe{
+        unsafe {
             let buffers = Buffers::new(1, 1);
             let mut err: i32 = 0;
             let mut playback_handle: *mut alsa::snd_pcm_t = ptr::null_mut();
@@ -248,7 +249,6 @@ impl DsdPlayer {
         } else {
             0f64
         }
-
     }
 
     pub fn pause(&self) {
@@ -260,7 +260,7 @@ impl DsdPlayer {
         self.paused.store(false, Relaxed);
     }
 
-    pub fn get_pos(&self) -> f64{
+    pub fn get_pos(&self) -> f64 {
         if let Some(reader) = self.reader.as_ref() {
             reader.get_position_percent()
         } else {
@@ -336,7 +336,6 @@ impl DsdPlayer {
         } else {
             Err(io::Error::last_os_error())
         }
-
     }
 
     pub fn play_on_current_thread(&mut self) {
@@ -358,7 +357,9 @@ impl DsdPlayer {
             let mut work_slices = self.buffers.get_slice_for_reader();
             self.reader_semaphore.acquire();
             let bytes = match self
-                .reader.as_mut().unwrap()
+                .reader
+                .as_mut()
+                .unwrap()
                 .read(&mut work_slices, alsa_buffer_size / num_channels as usize)
             {
                 Ok(b) => b,
@@ -471,6 +472,15 @@ impl DsdPlayer {
             if alsa::snd_pcm_prepare(self.playback_handle.clone()) < 0 {
                 panic!("cannot prepare audio interface for use");
             }
+        }
+    }
+}
+
+impl Drop for DsdPlayer {
+    fn drop(&mut self) {
+        unsafe {
+            alsa::snd_pcm_drain(self.playback_handle);
+            alsa::snd_pcm_close(self.playback_handle);
         }
     }
 }

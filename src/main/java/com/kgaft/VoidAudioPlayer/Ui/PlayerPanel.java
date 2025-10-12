@@ -1,10 +1,12 @@
 package com.kgaft.VoidAudioPlayer.Ui;
 
+import com.kgaft.VoidAudioPlayer.Model.MPlayer;
 import com.kgaft.VoidAudioPlayer.Native.Player;
 import com.kgaft.VoidAudioPlayer.Ui.Util.DualStateButton;
 import com.kgaft.VoidAudioPlayer.Ui.Util.IconInflater;
 import com.kgaft.VoidAudioPlayer.Ui.Util.IconResizer;
 import com.kgaft.VoidAudioPlayer.Ui.Util.ResizerWorkMode;
+import com.kgaft.VoidAudioPlayer.Verbose.Track;
 
 import javax.swing.*;
 import java.awt.*;
@@ -15,10 +17,8 @@ public class PlayerPanel extends JPanel{
     private JButton prevTrackButton;
     private JButton nextTrackButton;
     private TrackControlFlow controlFlow;
-    private long playerHandle;
     private JPanel manipulationsPanel;
     private IconResizer resizer;
-    private boolean firstTime = true;
     public PlayerPanel(int width, int height) {
         super();
         resizer = new IconResizer(0.7f,0.7f, ResizerWorkMode.USE_MINIMUM);
@@ -27,7 +27,7 @@ public class PlayerPanel extends JPanel{
         int size = Math.min(width, height);
         manipulationsPanel = new JPanel();
         manipulationsPanel.setLayout(new GridLayout(1, 3));
-        playerHandle = Player.initializePlayer();
+
 
         java.util.List<String> devices = Player.getDevices();
         devices.forEach(System.out::println);
@@ -35,7 +35,7 @@ public class PlayerPanel extends JPanel{
         Icon playIcon = IconInflater.loadIcon("icons/play.svg", size, size);
         Icon pauseIcon = IconInflater.loadIcon("icons/pause.svg", size, size);
         manipulationsPanel.setSize(width, height);
-        playPauseButton = new DualStateButton(playIcon, pauseIcon);
+        playPauseButton = new DualStateButton(pauseIcon, playIcon);
         prevTrackButton = new JButton(IconInflater.loadIcon("icons/previous.svg", size,size));
         nextTrackButton = new JButton(IconInflater.loadIcon("icons/next.svg", size, size));
 
@@ -49,25 +49,19 @@ public class PlayerPanel extends JPanel{
         manipulationsPanel.add(nextTrackButton);
 
         setLayout(new BorderLayout());
-        controlFlow = new TrackControlFlow(playerHandle);
+        controlFlow = new TrackControlFlow();
 
         add(manipulationsPanel, BorderLayout.WEST);
         add(controlFlow,  BorderLayout.CENTER);
         playPauseButton.addActionListener(e -> {
-            if (playPauseButton.isState()) {
-                Player.setPlaying(playerHandle, true);
+            if (!playPauseButton.isState()) {
+                MPlayer.play();
                 controlFlow.startControlFlow();
             } else {
-                Player.setPlaying(playerHandle, false);
+                MPlayer.pause();
                 controlFlow.stopControlFlow();
             }
         });
-    }
-
-    public void seekTrack(float precent) {
-        Player.setPlaying(playerHandle, true);
-        controlFlow.startControlFlow();
-        Player.seekTrack(playerHandle, precent);
     }
 
 
@@ -79,19 +73,10 @@ public class PlayerPanel extends JPanel{
         prevTrackButton.addActionListener(actionListener);
     }
 
-    public void loadTrack(String path) {
-        path = path.replace("\\", "/");
-        if (!path.startsWith("/")) {
-            path = "/" + path;
-        }
-        if(!firstTime) {
-            Player.setPlaying(playerHandle, true);
-            controlFlow.stopControlFlow();
-        }
-        firstTime = false;
-
-        Player.stop(playerHandle);
-        Player.loadTrack(playerHandle, path);
+    public void loadTrack(Track track) {
+        MPlayer.getPlayList().pushTrack(track);
+        MPlayer.startPlaying(0);
+        controlFlow.startControlFlow();
     }
 
 }

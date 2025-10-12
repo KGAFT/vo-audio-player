@@ -2,6 +2,8 @@ package com.kgaft.VoidAudioPlayer;
 
 import com.formdev.flatlaf.themes.FlatMacDarkLaf;
 
+import com.kgaft.VoidAudioPlayer.Model.DsdDeviceInfo;
+import com.kgaft.VoidAudioPlayer.Model.MPlayer;
 import com.kgaft.VoidAudioPlayer.Native.PlayerDsd;
 import com.kgaft.VoidAudioPlayer.Verbose.*;
 import javax.swing.*;
@@ -28,34 +30,22 @@ public class Main {
     public static void main(String[] args) throws InterruptedException {
 
         LibraryIndex index = LibraryIndex.getInstance();
-        //index.addDirectory("/mnt/files2/Music");
+        index.addDirectory("/mnt/files2/Music");
         try {
             UIManager.setLookAndFeel(new FlatMacDarkLaf());
         } catch (Exception e) {
             e.printStackTrace();
         }
-        PlayerWindow window = new PlayerWindow(index.getAlbums());
 
-        /*
-        List<String> devices = PlayerDsd.enumerateSupportedDevices();
+
+        List<DsdDeviceInfo> devices = MPlayer.enumerateDsdDevices();
         for (int i = 0; i < devices.size(); i++) {
-            System.out.println("id: "+i +" device name: "+devices.get(i));
+            System.out.println("id: "+i +" device name: "+devices.get(i).getDescription());
         }
+        System.out.println("Select dsd device: ");
         Scanner scanner = new Scanner(System.in);
-        String name = devices.get(scanner.nextInt());
-        name = name.split("/:/")[0];
-        System.out.println(name);
-        long playerHandle = PlayerDsd.initializePlayer(name);
-        PlayerDsd.loadTrack(playerHandle, "/mnt/files2/Music/test.dsf");
-        new Thread(() -> {
-            PlayerDsd.playOnCurrentThread(playerHandle);
-        }).start();
-        Thread.sleep(1000);
-        PlayerDsd.seekTrack(playerHandle, 0.5f);
-        while (true) {
-
-        }
-
-         */
+        DsdDeviceInfo name = devices.get(scanner.nextInt());
+        MPlayer.initDsdDevice(name);
+        PlayerWindow window = new PlayerWindow(index.getAlbums());
     }
 }

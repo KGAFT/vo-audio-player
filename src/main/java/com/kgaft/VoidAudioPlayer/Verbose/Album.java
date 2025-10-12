@@ -92,6 +92,10 @@ public class Album {
         return cover;
     }
 
+    public void setDuration(long duration) {
+        this.duration = duration;
+    }
+
     public long getDuration() {
         if (duration == 0) {
             long curDur = 0;
@@ -102,6 +106,20 @@ public class Album {
             return curDur;
         }
         return duration;
+    }
+
+    public void processDuration() {
+        if(duration == 0){
+            long curDur = 0;
+            for (Track track : tracks) {
+                curDur += track.getDurationMs();
+            }
+            duration = curDur;
+        }
+        if(duration == 0){
+            System.err.println("DURATION_ERROR: "+name);
+        }
+        tracks.forEach(track -> track.setAlbumDurationMs(duration));
     }
 
     public void sortTracks() {

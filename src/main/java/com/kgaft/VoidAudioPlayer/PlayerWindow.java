@@ -76,19 +76,13 @@ public class PlayerWindow extends JFrame implements IOnAlbumSelected, ActionList
     @Override
     public void onTrackSelected(Track track) {
         if (firstLoad || track.getOffsetMs() == 0) {
-            playerPanel.loadTrack("\\" + track.getPath());
+            playerPanel.loadTrack(track);
             try {
                 Thread.sleep(500);
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }
             firstLoad = false;
-        }
-        if (track.getOffsetMs() != 0) {
-            float offsetMs = track.getOffsetMs();
-            float durationMs = track.getDurationMs();
-            float offset = (offsetMs/durationMs);
-            playerPanel.seekTrack(offset);
         }
         remove(trackPanel);
         trackPanel = new TrackPanel(track);
