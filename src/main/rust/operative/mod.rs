@@ -4,4 +4,4 @@ pub mod dsd_player;
 pub mod library_serializer;
 
 pub mod dsd_readers;
-mod cue_parser;
+pub mod cue_parser;

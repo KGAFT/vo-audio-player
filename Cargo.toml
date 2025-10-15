@@ -24,7 +24,7 @@ id3 = "1.16.3"
 bincode = { version = "2", features = ["serde"] }
 serde = { version = "1.0.223", features = ["derive"] }
 byteorder = "1.4"
-rcue = "*"
+cue = "*"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 # low-level ALSA FFI

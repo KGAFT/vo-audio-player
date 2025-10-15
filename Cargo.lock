@@ -310,6 +310,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
 
 [[package]]
+name = "cmake"
+version = "0.1.54"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e7caa3f9de89ddbe2c607f4101924c5abec803763ae9534e4f4d7d8f84aa81f0"
+dependencies = [
+ "cc",
+]
+
+[[package]]
 name = "combine"
 version = "4.6.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -392,6 +401,26 @@ name = "crossbeam-utils"
 version = "0.8.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d0a5c400df2834b80a4c3327b3aad3a4c4cd4de0629063962b03235697506a28"
+
+[[package]]
+name = "cue"
+version = "3.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "690eedca1eb72586e5359d32c43e8e7497aeed1c469b8b07b4eb8500056d3287"
+dependencies = [
+ "cue-sys",
+ "libc",
+]
+
+[[package]]
+name = "cue-sys"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1d655a8fb46d3d9550ff44ade93963b2edb770acf0f5ab7d24e29591778d55f8"
+dependencies = [
+ "cmake",
+ "libc",
+]
 
 [[package]]
 name = "data-encoding"
@@ -1314,12 +1343,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "20675572f6f24e9e76ef639bc5552774ed45f1c30e2951e1e99c59888861c539"
 
 [[package]]
-name = "rcue"
-version = "0.1.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fca1481d62f18158646de2ec552dd63f8bdc5be6448389b192ba95c939df997e"
-
-[[package]]
 name = "rfd"
 version = "0.15.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1688,12 +1711,12 @@ dependencies = [
  "bincode",
  "byteorder",
  "crossbeam",
+ "cue",
  "dsf",
  "gstreamer",
  "id3",
  "jni",
  "lofty",
- "rcue",
  "rfd",
  "serde",
 ]

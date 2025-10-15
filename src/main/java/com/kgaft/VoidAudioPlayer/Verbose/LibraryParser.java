@@ -1,9 +1,7 @@
 package com.kgaft.VoidAudioPlayer.Verbose;
 
 
-import org.digitalmediaserver.cuelib.CueSheet;
-import org.digitalmediaserver.cuelib.FileData;
-import org.digitalmediaserver.cuelib.TrackData;
+import com.kgaft.VoidAudioPlayer.Native.CueParser;
 
 import java.io.File;
 import java.io.IOException;
@@ -68,7 +66,7 @@ public class LibraryParser {
         if (cueSheets != null) {
             cueSheets.forEach(file1 -> {
                 try {
-                    CueSheet cueSheet = new CueSheet(Path.of(file1.getAbsolutePath()));
+                    List<CueAlbum> cueSheet = CueParser.parseCueFile(file1.getAbsolutePath());
                     CueParseResult result = processCueSheet(cueSheet, filesInfos, output);
                     List<File> newAudioFiles = filesInfos.get("audio");
                     if (newAudioFiles != null) {
@@ -121,8 +119,48 @@ public class LibraryParser {
 
     }
 
-    public static CueParseResult processCueSheet(CueSheet sheet, HashMap<String, List<File>> files, List<Album> albums) {
+    public static CueParseResult processCueSheet(List<CueAlbum> sheet, HashMap<String, List<File>> files, List<Album> albums) {
+        List<String> artistNames = new ArrayList<>();
+        List<File> filesToRemove = new ArrayList<>();
+        List<Album> newAlbums = new ArrayList<>();
+        sheet.forEach(album -> {
+            List<Track> tracks = new ArrayList<>();
+            File musicFile = tryFindCueRelatedFile(files, album.getPath());
+            if (musicFile != null) {
+                Track baseTrack = Track.getTrackInfo(musicFile.getAbsolutePath());
+                album.songs.forEach(trackInfo -> {
+                    Track child = new Track(baseTrack);
+                    if (trackInfo.getPerformer() != null && !trackInfo.getPerformer().isEmpty()) {
+                        child.setArtistName(trackInfo.getPerformer());
+                    }
+                    if(album.getTitle() != null && !album.getTitle().isEmpty()) {
+                        child.setAlbumName(album.getTitle());
+                    }
 
+                    child.setName(trackInfo.getTitle());
+                    child.setDurationMs(trackInfo.getDuration());
+                    child.setAlbumDurationMs(album.getDuration());
+                    child.setOffsetMs(trackInfo.getOffset());
+                    tracks.add(child);
+                });
+                if (!tracks.isEmpty()) {
+                    tryToFindOrCreateAlbum(tracks, albums, newAlbums, album.getDuration(),false);
+                    artistNames.add(tracks.getFirst().getArtistName());
+                    filesToRemove.add(musicFile);
+                } else {
+                    tracks.add(baseTrack);
+                    tryToFindOrCreateAlbum(tracks, albums, newAlbums, baseTrack.getAlbumDurationMs(), false);
+                    artistNames.add(tracks.getFirst().getArtistName());
+                    filesToRemove.add(musicFile);
+                    //         System.out.println(musicFile.getAbsolutePath());
+                }
+            }
+        });
+        CueParseResult result = new CueParseResult();
+        result.newAlbums = newAlbums;
+        result.artistNames = artistNames;
+        result.filesToRemove = filesToRemove;
+        return result;
     }
 
     public static void tryToFindOrCreateAlbum(List<Track> tracks, List<Album> albums, List<Album> newAlbums, long albumDuration, boolean sortTracks) {
