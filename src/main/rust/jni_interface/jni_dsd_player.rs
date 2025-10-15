@@ -78,7 +78,7 @@ pub extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_PlayerDsd_seekTrack
     handle: jlong,
     percent: jfloat,
 ) -> jboolean {
-    let player = unsafe{(handle as *mut DsdPlayer).as_mut().unwrap()};
+    let mut player = unsafe{(handle as *mut DsdPlayer).as_mut().unwrap()};
     player.seek(percent as f64).is_ok() as jboolean
 }
 

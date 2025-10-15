@@ -35,6 +35,9 @@ public class MPlayer {
 
     public static void initNativePlayer() {
         nativePlayer = Player.initializePlayer();
+        new Thread(() -> {
+            Player.pollEventsMain(nativePlayer);
+        }).start();
     }
 
     public static void pickDevice(String deviceName) {
@@ -52,7 +55,39 @@ public class MPlayer {
         return playList;
     }
 
-    public static void startPlaying(int playListStartIndex) {
+    public static void startPlayingPlaylist(){
+        new Thread(() -> {
+            int counter = 0;
+            while(counter<playList.getTrackList().size()){
+                System.err.println(counter);
+                loadTrack(counter);
+                try {
+                    Thread.sleep(5000);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+                if(dsdPlaying){
+                    while(PlayerDsd.isPlaying(dsdPlayer)){
+                        try {
+                            Thread.sleep(50);
+                        } catch (InterruptedException e) {
+                            throw new RuntimeException(e);
+                        }
+                    }
+                    System.err.println("Next track");
+                } else {
+                    while(Player.isPlaying(nativePlayer)){
+                        try {
+                            Thread.sleep(50);
+                        } catch (InterruptedException e) {}
+                    }
+                }
+                counter++;
+            }
+        }).start();
+    }
+
+    public static void loadTrack(int playListStartIndex) {
         if (nativePlayer == 0) {
             initNativePlayer();
         }
@@ -71,20 +106,27 @@ public class MPlayer {
             new Thread(() -> {
                 PlayerDsd.playOnCurrentThread(dsdPlayer);
             }).start();
-            PlayerDsd.seekTrack(dsdPlayer, (float) track.getOffsetMs() / (float) track.getAlbumDurationMs());
+            if(track.getOffsetMs()>0 &&track.getAlbumDurationMs()>0){
+                PlayerDsd.seekTrack(dsdPlayer, (float) track.getOffsetMs() / (float) track.getAlbumDurationMs());
+            }
         } else {
             if (!loadedTrackPath.equals(path)) {
+                Player.stop(nativePlayer);
                 Player.loadTrack(nativePlayer, path);
                 loadedTrackPath = path;
             }
             dsdPlaying = false;
             Player.setPlaying(nativePlayer, true);
+
             try {
                 Thread.sleep(500);
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }
-            Player.seekTrack(nativePlayer, track.getOffsetMs() / (float) track.getAlbumDurationMs());
+            if(track.getOffsetMs()>0 && track.getAlbumDurationMs()>0){
+                Player.seekTrack(nativePlayer, track.getOffsetMs() / (float) track.getAlbumDurationMs());
+            }
+
 
 
         }
@@ -94,27 +136,26 @@ public class MPlayer {
         float pos = 0;
         if (dsdPlaying) {
             pos = PlayerDsd.getTrackPos(dsdPlayer);
-            if (currentTrack.getOffsetMs() == 0) {
+            if (currentTrack.getAlbumDurationMs() == 0 || currentTrack.getOffsetMs() == 0) {
                 return pos;
             }
             return (pos * currentTrack.getAlbumDurationMs() - (float) currentTrack.getOffsetMs()) / (float) currentTrack.getDurationMs();
         } else {
             float localPos = (float) (Player.getTrackPos(nativePlayer) - currentTrack.getOffsetMs());
-
             return localPos / (float) currentTrack.getDurationMs();
         }
     }
 
     public static void seekTrack(float pos) {
         float seek = 0;
-        if(currentTrack.getOffsetMs() == 0) {
+        if(currentTrack.getOffsetMs() == 0 || currentTrack.getAlbumDurationMs() == 0) {
             seek = pos;
         } else {
             long tempPos = (long) (currentTrack.getOffsetMs() + currentTrack.getDurationMs()*pos);
             seek = (float)tempPos/(float)currentTrack.getAlbumDurationMs();
         }
         if(dsdPlaying){
-            PlayerDsd.seekTrack(nativePlayer, seek);
+            PlayerDsd.seekTrack(dsdPlayer, seek);
         } else {
             Player.seekTrack(nativePlayer, seek);
         }

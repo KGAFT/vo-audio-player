@@ -10,6 +10,7 @@ use std::time::Duration;
 pub struct AudioPlayer {
     playbin: gst::Element,
     playing: AtomicBool,
+    eos: AtomicBool
 }
 
 unsafe impl Send for AudioPlayer {}
@@ -33,6 +34,7 @@ impl AudioPlayer {
         Self {
             playbin,
             playing: AtomicBool::new(false),
+            eos: AtomicBool::new(false)
         }
     }
 
@@ -105,6 +107,7 @@ impl AudioPlayer {
 
     /// Start playback
     pub fn play(&self) {
+        self.eos.store(false, Relaxed);
         self.playing.store(true, Relaxed);
         self.playbin
             .set_state(gst::State::Playing)
@@ -120,7 +123,8 @@ impl AudioPlayer {
     }
 
     pub fn is_playing(&self) -> bool {
-        self.playing.load(Relaxed)
+        let playbin_state = self.playbin.state(None).1;
+        self.playing.load(Relaxed) && !self.eos.load(Relaxed)
     }
 
     /// Seek within the track by percentage (0.0 = start, 1.0 = end)
@@ -164,10 +168,10 @@ impl AudioPlayer {
         if let Some(bus) = self.playbin.bus() {
             while let Some(msg) = bus.timed_pop(gst::ClockTime::from_mseconds(10)) {
                 use gst::MessageView;
-
                 match msg.view() {
                     MessageView::Eos(..) => {
                         println!("End of stream reached");
+                        self.eos.store(true, Relaxed);
                         io::stdout().flush().unwrap();
                         return false; // signal playback ended
                     }
@@ -205,7 +209,6 @@ impl AudioPlayer {
     /// Current playback position
     pub fn position(&self) -> Option<Duration> {
         let pipeline = self.playbin.clone().dynamic_cast::<gst::Pipeline>().ok()?;
-
         pipeline
             .query_position::<gst::ClockTime>()
             .map(|pos| Duration::from_nanos(pos.nseconds()))

@@ -30,7 +30,7 @@ public class Main {
     public static void main(String[] args) throws InterruptedException {
 
         LibraryIndex index = LibraryIndex.getInstance();
-        index.addDirectory("/mnt/files2/Music");
+        // index.addDirectory("/mnt/files2/Music");
         try {
             UIManager.setLookAndFeel(new FlatMacDarkLaf());
         } catch (Exception e) {

@@ -19,6 +19,7 @@ public class PlayerPanel extends JPanel{
     private TrackControlFlow controlFlow;
     private JPanel manipulationsPanel;
     private IconResizer resizer;
+    private boolean alreadyLoaded = false;
     public PlayerPanel(int width, int height) {
         super();
         resizer = new IconResizer(0.7f,0.7f, ResizerWorkMode.USE_MINIMUM);
@@ -75,8 +76,11 @@ public class PlayerPanel extends JPanel{
 
     public void loadTrack(Track track) {
         MPlayer.getPlayList().pushTrack(track);
-        MPlayer.startPlaying(0);
-        controlFlow.startControlFlow();
+        if(!alreadyLoaded) {
+            MPlayer.startPlayingPlaylist();
+            alreadyLoaded = true;
+            controlFlow.startControlFlow();
+        }
     }
 
 }

@@ -83,6 +83,20 @@ impl DSFReader {
             data_start: 0,
         })
     }
+
+    pub fn empty() -> Self{
+        Self {
+            file: File::create("super_empty").unwrap(),
+            buf: Vec::new(),
+            ch: 0,
+            blocksize: 0,
+            filled: 0,
+            pos: 0,
+            total_samples: 0,
+            read_samples: 0,
+            data_start: 0,
+        }
+    }
 }
 
 impl DSDReader for DSFReader {
@@ -274,6 +288,23 @@ impl DFFReader {
             planar: true,
             is_msb_first: true,
         })
+    }
+
+    pub fn empty() -> Self{
+        Self {
+            file: File::create("super_empty").unwrap(),
+            buf: Vec::new(),
+            ch: 0,
+            blocksize: 4096, // starting block size; we will use it as read chunk per channel
+            filled: 0,
+            pos: 0,
+            total_samples: 0,
+            read_samples: 0,
+            data_start: 0,
+            data_size: 0,
+            planar: true,
+            is_msb_first: true,
+        }
     }
 
     /// Switch layout if your file is interleaved

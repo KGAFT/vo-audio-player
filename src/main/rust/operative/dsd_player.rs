@@ -261,11 +261,12 @@ impl DsdPlayer {
     }
 
     pub fn get_pos(&self) -> f64 {
-        if let Some(reader) = self.reader.as_ref() {
+        let res = if let Some(reader) = self.reader.as_ref() {
             reader.get_position_percent()
         } else {
             0f64
-        }
+        };
+        res
     }
 
     pub fn stop(&self) {
@@ -302,9 +303,7 @@ impl DsdPlayer {
             std::process::exit(1);
         }
         self.reader = Some(reader);
-        if self.format.is_alsa_update_need(&format) {
-            self.reprepare_alsa_sync();
-        }
+        self.reprepare_alsa_sync();
         self.update_hw_params(&format, self.buffers.alsa_buffer_size);
         self.format = format;
         self.stoped.store(false, Relaxed);
@@ -328,14 +327,17 @@ impl DsdPlayer {
     }
 
     pub fn seek(&mut self, percent: f64) -> Result<(), io::Error> {
-        if let Some(reader) = self.reader.as_mut() {
-            self.reader_semaphore.acquire();
+        self.reader_semaphore.acquire();
+        let res = if let Some(reader) = self.reader.as_mut() {
             let res = reader.seek_percent(percent);
-            self.reader_semaphore.release();
+            println!("Seeked: {}", percent);
             res
         } else {
+            eprintln!("Failed");
             Err(io::Error::last_os_error())
-        }
+        };
+        self.reader_semaphore.release();
+        res
     }
 
     pub fn play_on_current_thread(&mut self) {
@@ -400,6 +402,7 @@ impl DsdPlayer {
                 break;
             }
         }
+        self.is_playing.store(false, Relaxed);
         self.stoped.store(true, Relaxed);
     }
 

@@ -1,13 +1,14 @@
-use jni::JNIEnv;
-use jni::objects::{JClass, JObject, JString, JValue};
-use jni::sys::jobject;
 use crate::operative::cue_parser::{cue_album_to_java, parse_cue_file};
+use crate::util::text_decoder::binary_to_text;
+use jni::JNIEnv;
+use jni::objects::{JByteArray, JClass, JObject, JString, JValue};
+use jni::sys::{jbyte, jbyteArray, jobject, jstring};
 
 #[unsafe(no_mangle)]
 pub unsafe extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_CueParser_parseCueFile(
     mut env: JNIEnv,
     _class: JClass,
-    file_path: JString
+    file_path: JString,
 ) -> jobject {
     let res = parse_cue_file(env.get_string(&file_path).unwrap().to_str().unwrap());
     if res.is_none() {
@@ -29,7 +30,18 @@ pub unsafe extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_CueParser_pa
             "(Ljava/lang/Object;)Z",
             &[JValue::Object(&album_j)],
         )
-            .unwrap();
+        .unwrap();
     }
     list_obj.as_raw()
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_CueParser_decodeText(
+    mut env: JNIEnv,
+    _class: JClass,
+    data: jbyteArray,
+) -> jstring {
+    let bytes: Vec<u8> = env.convert_byte_array(&JByteArray::from_raw(data)).unwrap();
+    let decoded = binary_to_text(bytes.as_slice());
+    env.new_string(decoded).unwrap().as_raw()
 }

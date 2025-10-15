@@ -1,70 +1,157 @@
-use std::time::Duration;
+use crate::util::text_decoder::binary_to_text;
+use cue::cd::CD;
+use cue::cd_text::PTI;
 use jni::JNIEnv;
 use jni::objects::{JObject, JObjectArray, JString, JValue};
 use jni::sys::jobject;
+use std::collections::HashMap;
+use std::fs;
+use std::fs::File;
+use std::path::{Path, PathBuf};
+use std::time::Duration;
 
-pub struct CueSong{
+
+#[derive(Clone)]
+pub struct CueSong {
     offset: Duration,
     title: String,
     duration: Duration,
     performer: String,
-
 }
 
-pub struct CueAlbum{
+pub struct CueAlbum {
     title: String,
     path: String,
     duration: Duration,
     songs: Vec<CueSong>,
-    performer: String
+    performer: String,
 }
 
-pub fn parse_cue_file(path: &str) -> Option<Vec<CueAlbum>>{
-    let cue = rcue::parser::parse_from_file(path, true);
-    if cue.is_err(){
-        eprintln!("Parsing error: file: {}  error: {}", path,cue.unwrap_err().to_string());
+pub fn parse_cue_file(path: &str) -> Option<Vec<CueAlbum>> {
+
+    let file = fs::read(Path::new(path));
+    if file.is_err() {
+        eprintln!("Failed to read cue file: {}", path);
         return None;
     }
-    let mut cue = cue.unwrap();
-    let performer_res = cue.performer.as_ref();
-    let mut performer = String::new();
-    if performer_res.is_some(){
-        performer = performer_res.unwrap().clone();
+    let text = binary_to_text(file.unwrap().as_slice());
+
+    println!("trying to open cue");
+    let cue = CD::parse(text);
+    if cue.is_err() {
+        eprintln!("Failed to parse cue file: {}", path);
+        return None;
     }
-    let title_res = cue.performer;
-    let mut title = String::new();
-    if title_res.is_some() {
-        title = title_res.unwrap();
-    }
-    let mut cue_albums = Vec::new();
-    for mut file in cue.files.iter_mut(){
-        let mut cue_album = CueAlbum{path: file.file.clone(), duration: Duration::from_millis(0), songs: Vec::with_capacity(file.tracks.len()),
-            performer: performer.clone(), title: title.clone()};
-        let mut album_dur: usize = 0;
-        while !file.tracks.is_empty() {
-            let track = file.tracks.remove(0);
-            if let Some(start_index) = find_index(&track.indices){
-                let mut track = CueSong{
-                    offset: start_index,
-                    title: track.title.unwrap_or("untitled".to_string()),
-                    duration: Duration::from_millis(0),
-                    performer: track.performer.unwrap_or(track.songwriter.unwrap_or(String::new()))
-                };
-                let mut duration = Duration::from_millis(0);
-                if let Some(next_track) = file.tracks.get(0){
-                    duration = find_index(&next_track.indices).unwrap_or(Duration::from_millis(0));
-                }
-                track.duration = duration;
-                cue_album.songs.push(track);
-                album_dur+=duration.as_millis() as usize;
+    let cue = cue.unwrap();
+    println!("Cue readed");
+    let mut cd_text = cue.get_cdtext();
+    //Some of this shit maybe artist, due to how people writing this
+    println!("trying to read artist");
+    let artist = cd_text.read(PTI::Performer).unwrap_or(
+        cd_text.read(PTI::Songwriter).unwrap_or(
+            cd_text.read(PTI::Arranger).unwrap_or(
+                cd_text
+                    .read(PTI::Composer)
+                    .unwrap_or("unknown artist".to_string()),
+            ),
+        ),
+    );
+    println!("artist read");
+    let main_album = cd_text.read(PTI::Title).unwrap_or("untitled".to_string());
+    let mut tracks_map: HashMap<String, Vec<CueSong>> = HashMap::new();
+    for i in 0..cue.get_track_count() {
+        let track = cue.get_track(i).unwrap();
+        cd_text = track.get_cdtext();
+        /*
+        let artist = cd_text.read(PTI::Performer).unwrap_or(
+            cd_text.read(PTI::Songwriter).unwrap_or(
+                cd_text.read(PTI::Arranger).unwrap_or(
+                    cd_text
+                        .read(PTI::Composer)
+                        .unwrap_or(artist.clone()),
+                ),
+            ),
+        );
+
+         */
+        println!("trying to get filename");
+        let filename = track.get_filename();
+        println!("filename obtained");
+        let mut target_container =
+            if let Some(container) = tracks_map.get_mut(&filename) {
+                container
             } else {
-                continue;
-            }
-        }
-        cue_album.duration = Duration::from_millis(album_dur as u64);
-        cue_albums.push(cue_album);
+                tracks_map.insert(filename.clone(), Vec::new());
+                tracks_map.get_mut(&filename).unwrap()
+            };
+        println!("trying to get offset");
+        let off = frames_to_duration(track.get_start());
+        println!("offset obtained");
+        println!("trying to get duration");
+        let dur = frames_to_duration(track.get_length().unwrap_or(0));
+        println!("duration obtained");
+        let song_info = CueSong{
+            offset: off,
+            title: cd_text.read(PTI::Title).unwrap_or("untitled".to_string()),
+            duration: dur,
+            performer: artist.clone(),
+        };
+        target_container.push(song_info);
     }
-    Some(cue_albums)
+    if tracks_map.len() == 1{
+        let mut key = String::new();
+        for info in tracks_map.iter_mut(){
+            key = info.0.clone();
+            break
+        }
+        let tracks = tracks_map.remove(&key).unwrap();
+        let album_name = if main_album.eq("untitled") {
+            key.clone()
+        } else {
+            main_album.clone()
+        };
+        let duration = calc_album_duration(tracks.as_slice());
+        let album = CueAlbum{
+            title: album_name,
+            path: key,
+            duration,
+            songs: tracks,
+            performer: artist.clone(),
+        };
+        Some(vec![album])
+    } else {
+        let mut albums_res: Vec<CueAlbum> = Vec::new();
+        tracks_map.iter_mut().for_each(|(filename, songs)|{
+            let album_name = main_album.clone() +" ("+filename+")";
+            let duration = calc_album_duration(songs.as_slice());
+            let album = CueAlbum{
+                title: album_name,
+                path: filename.clone(),
+                duration,
+                songs: songs.clone(),
+                performer: artist.clone(),
+            };
+            albums_res.push(album);
+        });
+        Some(albums_res)
+    }
+}
+
+fn calc_album_duration(songs: &[CueSong]) -> Duration{
+    let mut duration = 0;
+    for x in songs.iter() {
+        duration+=x.duration.as_millis()
+    };
+    if duration == 0{
+        for x in songs.iter() {
+            duration+=x.offset.as_millis()
+        };
+    }
+    Duration::from_millis(duration as u64)
+}
+
+fn frames_to_duration(frames: i64) -> Duration {
+    Duration::from_millis((frames * 1000 )as u64 / 75 as u64)
 }
 
 fn find_index(indices: &Vec<(String, Duration)>) -> Option<Duration> {
@@ -76,15 +163,14 @@ fn find_index(indices: &Vec<(String, Duration)>) -> Option<Duration> {
         }
     }
     if start_index.is_zero() {
-        let res =  indices.first();
-        if res.is_none(){
+        let res = indices.first();
+        if res.is_none() {
             return None;
         }
         start_index = res.unwrap().1.clone();
     }
     Some(start_index)
 }
-
 
 /// Convert Rust CueSong → Java CueSong
 fn cue_song_to_java(env: &mut JNIEnv, song: &CueSong) -> jni::errors::Result<jobject> {
@@ -108,7 +194,10 @@ fn cue_song_to_java(env: &mut JNIEnv, song: &CueSong) -> jni::errors::Result<job
 }
 
 /// Convert Rust CueAlbum → Java CueAlbum using ArrayList
-pub unsafe fn cue_album_to_java(env: &mut JNIEnv, album: &CueAlbum) -> jni::errors::Result<jobject> {
+pub unsafe fn cue_album_to_java(
+    env: &mut JNIEnv,
+    album: &CueAlbum,
+) -> jni::errors::Result<jobject> {
     // Create ArrayList<CueSong>
     let arraylist_class = env.find_class("java/util/ArrayList")?;
     let arraylist_obj = env.new_object(&arraylist_class, "()V", &[])?;
@@ -146,11 +235,23 @@ pub unsafe fn cue_album_to_java(env: &mut JNIEnv, album: &CueAlbum) -> jni::erro
 }
 
 /// Convert Java CueAlbum → Rust CueAlbum
-pub unsafe fn cue_album_from_java(env: &mut JNIEnv, j_album: JObject) -> jni::errors::Result<CueAlbum> {
+pub unsafe fn cue_album_from_java(
+    env: &mut JNIEnv,
+    j_album: JObject,
+) -> jni::errors::Result<CueAlbum> {
     unsafe {
-        let j_title: JString = env.get_field(&j_album, "title", "Ljava/lang/String;")?.l()?.into();
-        let j_path: JString = env.get_field(&j_album, "path", "Ljava/lang/String;")?.l()?.into();
-        let j_perf: JString = env.get_field(&j_album, "performer", "Ljava/lang/String;")?.l()?.into();
+        let j_title: JString = env
+            .get_field(&j_album, "title", "Ljava/lang/String;")?
+            .l()?
+            .into();
+        let j_path: JString = env
+            .get_field(&j_album, "path", "Ljava/lang/String;")?
+            .l()?
+            .into();
+        let j_perf: JString = env
+            .get_field(&j_album, "performer", "Ljava/lang/String;")?
+            .l()?
+            .into();
         let j_duration = env.get_field(&j_album, "duration", "J")?.j()? as u64;
         let j_songs_list = env.get_field(&j_album, "songs", "Ljava/util/List;")?.l()?;
 
@@ -198,8 +299,14 @@ pub unsafe fn cue_album_from_java(env: &mut JNIEnv, j_album: JObject) -> jni::er
 
 /// Convert Java CueSong → Rust CueSong
 fn cue_song_from_java(env: &mut JNIEnv, j_song: JObject) -> jni::errors::Result<CueSong> {
-    let s_title: JString = env.get_field(&j_song, "title", "Ljava/lang/String;")?.l()?.into();
-    let s_perf: JString = env.get_field(&j_song, "performer", "Ljava/lang/String;")?.l()?.into();
+    let s_title: JString = env
+        .get_field(&j_song, "title", "Ljava/lang/String;")?
+        .l()?
+        .into();
+    let s_perf: JString = env
+        .get_field(&j_song, "performer", "Ljava/lang/String;")?
+        .l()?
+        .into();
     let s_offset = env.get_field(&j_song, "offset", "J")?.j()? as u64;
     let s_duration = env.get_field(&j_song, "duration", "J")?.j()? as u64;
 

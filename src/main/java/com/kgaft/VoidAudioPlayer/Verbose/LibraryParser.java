@@ -1,12 +1,15 @@
 package com.kgaft.VoidAudioPlayer.Verbose;
 
-
+import com.bunjlabs.jecue.CueLoader;
+import com.bunjlabs.jecue.entities.CueSheet;
+import com.bunjlabs.jecue.entities.CueTrackIndex;
+import com.bunjlabs.jecue.entities.CueTrackInfo;
 import com.kgaft.VoidAudioPlayer.Native.CueParser;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.*;
 
 class CueParseResult {
@@ -66,8 +69,10 @@ public class LibraryParser {
         if (cueSheets != null) {
             cueSheets.forEach(file1 -> {
                 try {
-                    List<CueAlbum> cueSheet = CueParser.parseCueFile(file1.getAbsolutePath());
-                    CueParseResult result = processCueSheet(cueSheet, filesInfos, output);
+                    byte[] data = Files.readAllBytes(file1.toPath());
+                    String cueText = CueParser.decodeText(data);
+                    CueLoader loader = new CueLoader(cueText);
+                    CueParseResult result = processCueSheet(loader.load(), filesInfos, output);
                     List<File> newAudioFiles = filesInfos.get("audio");
                     if (newAudioFiles != null) {
                         result.filesToRemove.forEach(newAudioFiles::remove);
@@ -88,7 +93,7 @@ public class LibraryParser {
                 Track track = Track.getTrackInfo(file1.getAbsolutePath());
                 tracks.add(track);
             });
-            tryToFindOrCreateAlbum(tracks, output, newAlbums, 0, true);
+            tryToFindOrCreateAlbum(tracks, output, newAlbums, true);
         }
         if (!output.isEmpty() && covers != null && !covers.isEmpty()) {
             int index = 0;
@@ -119,41 +124,63 @@ public class LibraryParser {
 
     }
 
-    public static CueParseResult processCueSheet(List<CueAlbum> sheet, HashMap<String, List<File>> files, List<Album> albums) {
+    public static CueParseResult processCueSheet(CueSheet sheet, HashMap<String, List<File>> files, List<Album> albums) {
         List<String> artistNames = new ArrayList<>();
         List<File> filesToRemove = new ArrayList<>();
         List<Album> newAlbums = new ArrayList<>();
-        sheet.forEach(album -> {
+        sheet.getFiles().forEach(cueFile -> {
             List<Track> tracks = new ArrayList<>();
-            File musicFile = tryFindCueRelatedFile(files, album.getPath());
+            File musicFile = tryFindCueRelatedFile(files, cueFile.getFileName());
             if (musicFile != null) {
                 Track baseTrack = Track.getTrackInfo(musicFile.getAbsolutePath());
-                album.songs.forEach(trackInfo -> {
-                    Track child = new Track(baseTrack);
-                    if (trackInfo.getPerformer() != null && !trackInfo.getPerformer().isEmpty()) {
-                        child.setArtistName(trackInfo.getPerformer());
+                for (int i = 0; i < cueFile.getTracks().size(); i++) {
+                    CueTrackInfo info = cueFile.getTracks().get(i);
+                    CueTrackIndex index2 = getIndex(info.getIndexes());
+                    long offset = (index2.getMinutes() * 60L + index2.getSeconds()) * 1000;
+                    long duration = 0;
+                    if (i != cueFile.getTracks().size() - 1) {
+                        CueTrackInfo info2 = cueFile.getTracks().get(i + 1);
+                        CueTrackIndex endIndex = getIndex(info2.getIndexes());
+                        duration = (endIndex.getMinutes() * 60L + endIndex.getSeconds()) * 1000 - offset;
+                    } else {
+                        duration = baseTrack.getDurationMs() - offset;
                     }
-                    if(album.getTitle() != null && !album.getTitle().isEmpty()) {
-                        child.setAlbumName(album.getTitle());
+                    Track track = new Track(baseTrack);
+                    if(baseTrack.getAlbumName() == null || baseTrack.getAlbumName().isEmpty()){
+                        track.setAlbumName(musicFile.getName());
+                        if(track.getAlbumName()==null || track.getAlbumName().isEmpty()){
+                            track.setAlbumName(info.getSongwriter());
+                            if(track.getAlbumName()==null ||track.getAlbumName().isEmpty()){
+                                track.setAlbumName(musicFile.getName());
+                            }
+                        }
                     }
-
-                    child.setName(trackInfo.getTitle());
-                    child.setDurationMs(trackInfo.getDuration());
-                    child.setAlbumDurationMs(album.getDuration());
-                    child.setOffsetMs(trackInfo.getOffset());
-                    tracks.add(child);
-                });
+                    if(baseTrack.getArtistName() ==null || baseTrack.getArtistName().isEmpty()){
+                        track.setArtistName(info.getPerformer());
+                        if(track.getArtistName()==null || track.getArtistName().isEmpty()){
+                            track.setArtistName(info.getSongwriter());
+                            if(track.getArtistName()==null ||track.getArtistName().isEmpty()){
+                                track.setArtistName(track.getAlbumName());
+                            }
+                        }
+                    }
+                    track.setName(info.getTitle());
+                    track.setOffsetMs(offset);
+                    track.setDurationMs(duration);
+                    tracks.add(track);
+                }
                 if (!tracks.isEmpty()) {
-                    tryToFindOrCreateAlbum(tracks, albums, newAlbums, album.getDuration(),false);
+                    tryToFindOrCreateAlbum(tracks, albums, newAlbums, false);
                     artistNames.add(tracks.getFirst().getArtistName());
                     filesToRemove.add(musicFile);
                 } else {
                     tracks.add(baseTrack);
-                    tryToFindOrCreateAlbum(tracks, albums, newAlbums, baseTrack.getAlbumDurationMs(), false);
+                    tryToFindOrCreateAlbum(tracks, albums, newAlbums, false);
                     artistNames.add(tracks.getFirst().getArtistName());
                     filesToRemove.add(musicFile);
                     //         System.out.println(musicFile.getAbsolutePath());
                 }
+
             }
         });
         CueParseResult result = new CueParseResult();
@@ -163,7 +190,7 @@ public class LibraryParser {
         return result;
     }
 
-    public static void tryToFindOrCreateAlbum(List<Track> tracks, List<Album> albums, List<Album> newAlbums, long albumDuration, boolean sortTracks) {
+    public static void tryToFindOrCreateAlbum(List<Track> tracks, List<Album> albums, List<Album> newAlbums, boolean sortTracks) {
         tracks.forEach(track -> {
             String album = track.getAlbumName();
             if (album.isEmpty()) {
@@ -175,7 +202,7 @@ public class LibraryParser {
                 if (album1.getName().equals(album)) {
                     found = true;
                     album1.getTracks().add(track);
-                    if (sortTracks) {
+                    if(sortTracks) {
                         album1.sortTracks();
                     }
                     break;
@@ -187,13 +214,10 @@ public class LibraryParser {
                 album1.setName(album);
                 album1.setArtist(track.getArtistName());
                 album1.setCover(track.getPictureBytes());
-                if (albumDuration > 0) {
-                    album1.setDuration(albumDuration);
-                }
                 album1.setGenre(track.getGenre());
                 album1.setYear(track.getYear());
                 album1.getTracks().add(track);
-                if (sortTracks) {
+                if(sortTracks) {
                     album1.sortTracks();
                 }
                 albums.add(album1);
@@ -212,12 +236,11 @@ public class LibraryParser {
         }
         return null;
     }
-    /*
 
     public static CueTrackIndex getIndex(Map<Integer, CueTrackIndex> indexes) {
         int index = 1;
         CueTrackIndex index2 = indexes.get(index);
-        if (index2 == null) {
+        if(index2 == null) {
             index = 0;
         }
         while (index2 == null) {
@@ -226,6 +249,4 @@ public class LibraryParser {
         }
         return index2;
     }
-
-     */
 }
