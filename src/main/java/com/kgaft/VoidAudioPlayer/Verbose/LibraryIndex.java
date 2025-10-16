@@ -125,7 +125,7 @@ public class LibraryIndex {
 
     public List<Album> getAlbums() {
         try {
-            return albumDao.queryForAll();
+            return albumDao.queryBuilder().orderBy("name", true).query();
         } catch (SQLException e) {
             e.printStackTrace();
             return null;

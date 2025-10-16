@@ -1,11 +1,10 @@
-/*
-use crate::operative::cue_parser::{cue_album_to_java};
+
 use crate::util::text_decoder::binary_to_text;
 use jni::JNIEnv;
-use jni::objects::{JByteArray, JClass, JObject, JString, JValue};
-use jni::sys::{jbyte, jbyteArray, jobject, jstring};
+use jni::objects::{JByteArray, JClass};
+use jni::sys::{jbyteArray, jstring};
 
-
+/*
 #[unsafe(no_mangle)]
 pub unsafe extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_CueParser_parseCueFile(
     mut env: JNIEnv,
@@ -36,7 +35,7 @@ pub unsafe extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_CueParser_pa
     }
     list_obj.as_raw()
 }
-
+ */
 #[unsafe(no_mangle)]
 pub unsafe extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_CueParser_decodeText(
     mut env: JNIEnv,
@@ -48,4 +47,4 @@ pub unsafe extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_CueParser_de
     env.new_string(decoded).unwrap().as_raw()
 }
 
- */
+

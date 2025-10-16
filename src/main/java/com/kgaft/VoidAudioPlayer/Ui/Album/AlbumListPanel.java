@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 
 class AlbumClickListener implements MouseListener {
     private Album album;
@@ -55,6 +56,7 @@ class AlbumClickListener implements MouseListener {
     }
 }
 
+
 public class AlbumListPanel extends JScrollPane implements IOnAlbumSelected {
     private JPanel albumPanel = new JPanel();
     private volatile List<AlbumClickListener> listeners = new ArrayList<AlbumClickListener>();
@@ -63,34 +65,35 @@ public class AlbumListPanel extends JScrollPane implements IOnAlbumSelected {
         super(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS,
                 JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         albumPanel.setLayout(new GridLayout(0, 3));
+        setViewportView(albumPanel);
         //Heavily rendering a lot of album covers, needs multithread
         Executor executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors()-1);
+        AtomicInteger counter = new AtomicInteger(0);
+        AtomicInteger decCounter = new AtomicInteger(albumList.size());
+        List<AlbumCard> cardsPrepared = new ArrayList<>(albumList.size());
         albumList.forEach(album -> {
+            int indexFinal = counter.get();
+            cardsPrepared.add(null);
             executor.execute(()-> {
-                if (album.getName().length() <= 0) {
-                    System.out.println(album.getArtist());
-                    album.getTracks().forEach(track -> {
-                        System.out.println(track.getName() + track.getAlbumName() + track.getPath() + track.getDurationMs());
-                    });
-                }
                 AlbumCard albumCard = new AlbumCard(album);
                 AlbumClickListener albumClickListener = new AlbumClickListener(album);
                 albumClickListener.setListener(this);
-                albumPanel.add(albumCard);
+                cardsPrepared.add(indexFinal, albumCard);
                 albumCard.addMouseListener(albumClickListener);
                 listeners.add(albumClickListener);
+                decCounter.decrementAndGet();
             });
+            counter.incrementAndGet();
         });
-        new Thread(()->{
-            try {
-                executor.wait();
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
+        while(decCounter.get()>0);
+        cardsPrepared.forEach(albumCard -> {
+            if(albumCard!=null) {
+                albumPanel.add(albumCard);
             }
-            albumPanel.invalidate();
-            invalidate();
         });
-        setViewportView(albumPanel);
+        albumPanel.invalidate();
+        invalidate();
+
         albumPanel.invalidate();
         getVerticalScrollBar().setUnitIncrement(18);
         invalidate();

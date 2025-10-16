@@ -11,6 +11,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.util.*;
+import java.util.stream.Collectors;
 
 class CueParseResult {
     public List<String> artistNames;
@@ -115,11 +116,35 @@ public class LibraryParser {
                     }
                     newAlbums.get(index).setCover(Files.readAllBytes(covers.getFirst().toPath()));
                     covers.remove(0);
-
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
             }
+            HashMap<String, List<String>> localFilters = new HashMap();
+            localFilters.put("image", Arrays.stream(IMAGE_EXTENSIONS).toList());
+            while(index < newAlbums.size()) {
+                if(newAlbums.get(index).getCover() != null && newAlbums.get(index).getCover().length != 0) {
+                    index++;
+                    continue;
+                }
+                ArrayList<File> dirs = Arrays.stream(directory.listFiles()).filter(file -> file.isDirectory()).collect(Collectors.toCollection(ArrayList::new));
+                for (File dir : dirs) {
+                    HashMap<String, List<File>> images = FileFilter.filterFiles(dir.listFiles(), localFilters);
+                    List<File> imagesFiles = images.get("image");
+                    if(imagesFiles == null || imagesFiles.isEmpty()) {
+                        continue;
+                    }
+                    try {
+                        newAlbums.get(index).setCover(Files.readAllBytes(imagesFiles.get(0).getAbsoluteFile().toPath()));
+                    } catch (IOException e) {
+                        continue;
+                    }
+                    break;
+                }
+                index++;
+            }
+
+
         }
 
     }
