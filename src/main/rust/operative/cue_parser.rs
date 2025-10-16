@@ -1,13 +1,10 @@
 use crate::util::text_decoder::binary_to_text;
-use cue::cd::CD;
-use cue::cd_text::PTI;
 use jni::JNIEnv;
-use jni::objects::{JObject, JObjectArray, JString, JValue};
+use jni::objects::{JObject, JString, JValue};
 use jni::sys::jobject;
 use std::collections::HashMap;
 use std::fs;
-use std::fs::File;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::time::Duration;
 
 
@@ -27,115 +24,6 @@ pub struct CueAlbum {
     performer: String,
 }
 
-pub fn parse_cue_file(path: &str) -> Option<Vec<CueAlbum>> {
-
-    let file = fs::read(Path::new(path));
-    if file.is_err() {
-        eprintln!("Failed to read cue file: {}", path);
-        return None;
-    }
-    let text = binary_to_text(file.unwrap().as_slice());
-
-    println!("trying to open cue");
-    let cue = CD::parse(text);
-    if cue.is_err() {
-        eprintln!("Failed to parse cue file: {}", path);
-        return None;
-    }
-    let cue = cue.unwrap();
-    println!("Cue readed");
-    let mut cd_text = cue.get_cdtext();
-    //Some of this shit maybe artist, due to how people writing this
-    println!("trying to read artist");
-    let artist = cd_text.read(PTI::Performer).unwrap_or(
-        cd_text.read(PTI::Songwriter).unwrap_or(
-            cd_text.read(PTI::Arranger).unwrap_or(
-                cd_text
-                    .read(PTI::Composer)
-                    .unwrap_or("unknown artist".to_string()),
-            ),
-        ),
-    );
-    println!("artist read");
-    let main_album = cd_text.read(PTI::Title).unwrap_or("untitled".to_string());
-    let mut tracks_map: HashMap<String, Vec<CueSong>> = HashMap::new();
-    for i in 0..cue.get_track_count() {
-        let track = cue.get_track(i).unwrap();
-        cd_text = track.get_cdtext();
-        /*
-        let artist = cd_text.read(PTI::Performer).unwrap_or(
-            cd_text.read(PTI::Songwriter).unwrap_or(
-                cd_text.read(PTI::Arranger).unwrap_or(
-                    cd_text
-                        .read(PTI::Composer)
-                        .unwrap_or(artist.clone()),
-                ),
-            ),
-        );
-
-         */
-        println!("trying to get filename");
-        let filename = track.get_filename();
-        println!("filename obtained");
-        let mut target_container =
-            if let Some(container) = tracks_map.get_mut(&filename) {
-                container
-            } else {
-                tracks_map.insert(filename.clone(), Vec::new());
-                tracks_map.get_mut(&filename).unwrap()
-            };
-        println!("trying to get offset");
-        let off = frames_to_duration(track.get_start());
-        println!("offset obtained");
-        println!("trying to get duration");
-        let dur = frames_to_duration(track.get_length().unwrap_or(0));
-        println!("duration obtained");
-        let song_info = CueSong{
-            offset: off,
-            title: cd_text.read(PTI::Title).unwrap_or("untitled".to_string()),
-            duration: dur,
-            performer: artist.clone(),
-        };
-        target_container.push(song_info);
-    }
-    if tracks_map.len() == 1{
-        let mut key = String::new();
-        for info in tracks_map.iter_mut(){
-            key = info.0.clone();
-            break
-        }
-        let tracks = tracks_map.remove(&key).unwrap();
-        let album_name = if main_album.eq("untitled") {
-            key.clone()
-        } else {
-            main_album.clone()
-        };
-        let duration = calc_album_duration(tracks.as_slice());
-        let album = CueAlbum{
-            title: album_name,
-            path: key,
-            duration,
-            songs: tracks,
-            performer: artist.clone(),
-        };
-        Some(vec![album])
-    } else {
-        let mut albums_res: Vec<CueAlbum> = Vec::new();
-        tracks_map.iter_mut().for_each(|(filename, songs)|{
-            let album_name = main_album.clone() +" ("+filename+")";
-            let duration = calc_album_duration(songs.as_slice());
-            let album = CueAlbum{
-                title: album_name,
-                path: filename.clone(),
-                duration,
-                songs: songs.clone(),
-                performer: artist.clone(),
-            };
-            albums_res.push(album);
-        });
-        Some(albums_res)
-    }
-}
 
 fn calc_album_duration(songs: &[CueSong]) -> Duration{
     let mut duration = 0;

@@ -35,7 +35,6 @@ pub fn open_dsd_auto(path: &str, format: &mut DSDFormat) -> io::Result<Box<dyn D
         b"FRM8" => {
             // DFF file
             let mut reader = DFFReader::new(path)?;
-            reader.set_planar(false);
             reader.open(format)?;
             Ok(Box::new(reader))
         }
@@ -256,19 +255,17 @@ impl DSDReader for DSFReader {
 }
 
 
+
 pub struct DFFReader {
     file: File,
-    buf: Vec<u8>,
-    ch: usize,
-    blocksize: usize, // bytes per channel block we read at once
-    filled: usize,
-    pos: usize,
-    total_samples: u64, // frames per channel
-    read_samples: u64,  // bits read in total (like DSFReader)
-    data_start: u64,
-    data_size: u64,
-    planar: bool, // true => per-channel blocks (channel0 block, channel1 block, ...), false => interleaved
-    is_msb_first: bool, // DFF often MSB-first
+    buf: Vec<u8>,          // internal interleaved read buffer (bytes: frames * channels)
+    ch: usize,             // channels
+    block_frames: usize,   // frames per internal read block (1 frame == 1 byte per channel)
+    filled_frames: usize,  // frames currently in buf
+    pos_frames: usize,     // current read position in frames inside buf
+    total_frames: u64,     // total frames (samples per channel)
+    read_frames: u64,      // frames read so far (position)
+    data_start: u64,       // start offset of DSD chunk payload
 }
 
 impl DFFReader {
@@ -278,342 +275,272 @@ impl DFFReader {
             file,
             buf: Vec::new(),
             ch: 0,
-            blocksize: 4096, // starting block size; we will use it as read chunk per channel
-            filled: 0,
-            pos: 0,
-            total_samples: 0,
-            read_samples: 0,
+            block_frames: 4096, // default frames per block
+            filled_frames: 0,
+            pos_frames: 0,
+            total_frames: 0,
+            read_frames: 0,
             data_start: 0,
-            data_size: 0,
-            planar: true,
-            is_msb_first: true,
         })
     }
 
-    pub fn empty() -> Self{
+    pub fn empty() -> Self {
         Self {
             file: File::create("super_empty").unwrap(),
             buf: Vec::new(),
             ch: 0,
-            blocksize: 4096, // starting block size; we will use it as read chunk per channel
-            filled: 0,
-            pos: 0,
-            total_samples: 0,
-            read_samples: 0,
+            block_frames: 4096,
+            filled_frames: 0,
+            pos_frames: 0,
+            total_frames: 0,
+            read_frames: 0,
             data_start: 0,
-            data_size: 0,
-            planar: true,
-            is_msb_first: true,
         }
     }
 
-    /// Switch layout if your file is interleaved
-    pub fn set_planar(&mut self, planar: bool) {
-        self.planar = planar;
+    // helper: read 4-byte id
+    fn read_id(&mut self) -> io::Result<[u8; 4]> {
+        let mut id = [0u8; 4];
+        self.file.read_exact(&mut id)?;
+        Ok(id)
     }
 
-    /// Switch bit order manually if autodetection suggests different
-    pub fn set_msb_first(&mut self, is_msb_first: bool) {
-        self.is_msb_first = is_msb_first;
+    // helper: read big-endian u64 (DFF/DSDIFF uses big-endian for chunk sizes)
+    fn read_be_u64(&mut self) -> io::Result<u64> {
+        self.file.read_u64::<BigEndian>()
     }
 }
 
 impl DSDReader for DFFReader {
     fn open(&mut self, format: &mut DSDFormat) -> io::Result<()> {
-        let mut ident = [0u8; 4];
-
-        // FRM8 header
-        self.file.read_exact(&mut ident)?;
-        if &ident != b"FRM8" {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "not DFF (no FRM8)",
-            ));
-        }
-        // FRM8 size (big endian 64-bit)
-        let _frm8_size = self.file.read_u64::<BigEndian>()?;
-        // form type should be "DSD "
-        self.file.read_exact(&mut ident)?;
-        if &ident != b"DSD " {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "not DFF (form != 'DSD ')",
-            ));
+        // --- FRM8 header (big-endian) ---
+        let id = self.read_id()?;
+        if &id != b"FRM8" {
+            return Err(io::Error::new(io::ErrorKind::InvalidData, "not FRM8 / DFF"));
         }
 
-        // iterate chunks until we find PROP and DSD
-        let mut sampling_rate: Option<u32> = None;
-        let mut channels: Option<u32> = None;
-        let mut data_chunk_size: u64 = 0;
-        let mut data_offset: u64 = 0;
+        // FRM8 size (big-endian u64) - skip/validate
+        let _frm8_size = self.read_be_u64()?; // we don't strictly need it here
+
+        // Next 4 bytes: format id - should be "DSD "
+        let fmt_id = self.read_id()?;
+        if &fmt_id != b"DSD " {
+            return Err(io::Error::new(io::ErrorKind::InvalidData, "not DSD container"));
+        }
+
+        // We'll parse chunks until we find the "DSD " audio chunk.
+        // PROP chunk contains SND subchunks (FS, CHNL, CMPR).
+        let mut found_dsd = false;
+        let mut dsd_chunk_size: u64 = 0;
+
+        // metadata we will fill from PROP/SND
+        let mut sample_rate_hz: Option<u32> = None;
+        let mut channels: Option<u16> = None;
+        // `lsbitfirst` in original C++ was configurable; default false here
+        format.is_lsb_first = false;
 
         loop {
-            // read chunk id (4) and chunk size (be64)
-            if let Err(_) = self.file.read_exact(&mut ident) {
-                break;
+            // read chunk header: 4-byte id + 8-byte BE size
+            let mut chunk_id = [0u8; 4];
+            // If we reach EOF unexpectedly, error
+            if let Err(e) = self.file.read_exact(&mut chunk_id) {
+                return Err(io::Error::new(io::ErrorKind::InvalidData, format!("unexpected EOF reading chunk id: {}", e)));
             }
-            let chunk_size = match self.file.read_u64::<BigEndian>() {
-                Ok(sz) => sz,
-                Err(_) => break,
-            };
+            let chunk_size = self.read_be_u64()?;
+            let chunk_payload_start = self.file.seek(SeekFrom::Current(0))?;
 
-            match &ident {
-                b"FVER" => {
-                    // version chunk — skip
-                    self.file.seek(SeekFrom::Current(chunk_size as i64))?;
-                }
+            match &chunk_id {
                 b"PROP" => {
-                    // PROP chunk contains SND (sound properties)
-                    let prop_start = self.file.seek(SeekFrom::Current(0))?;
-                    // next should be "SND "
-                    self.file.read_exact(&mut ident)?;
-                    if &ident != b"SND " {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidData,
-                            "PROP missing SND",
-                        ));
-                    }
-                    // SND chunk size
-                    let snd_size = self.file.read_u64::<BigEndian>()?;
-                    let prop_end = prop_start + chunk_size;
+                    // PROP payload starts with a 4-byte prop id (e.g. "SND ")
+                    let mut prop_id = [0u8; 4];
+                    self.file.read_exact(&mut prop_id)?;
+                    if &prop_id == b"SND " {
+                        // Parse subchunks inside SND until end of PROP
+                        let prop_end = chunk_payload_start + chunk_size;
+                        while self.file.seek(SeekFrom::Current(0))? < prop_end {
+                            // subchunk header: 4-byte id + 8-byte BE size
+                            let mut sub_id = [0u8; 4];
+                            if let Err(e) = self.file.read_exact(&mut sub_id) {
+                                return Err(io::Error::new(io::ErrorKind::InvalidData, format!("unexpected EOF in SND subchunk id: {}", e)));
+                            }
+                            let sub_size = self.read_be_u64()?;
+                            let sub_payload_start = self.file.seek(SeekFrom::Current(0))?;
 
-                    // read sub-chunks inside SND
-                    while self.file.seek(SeekFrom::Current(0))? < prop_end {
-                        // sub-chunk id and size
-                        self.file.read_exact(&mut ident)?;
-                        let sub_size = self.file.read_u64::<BigEndian>()?;
-                        match &ident {
-                            b"FS  " => {
-                                // sampling frequency 32-bit big-endian
-                                let fs = self.file.read_u32::<BigEndian>()?;
-                                sampling_rate = Some(fs);
-                            }
-                            b"CHNL" => {
-                                // channel count is stored as two bytes after an ID string (per spec may vary)
-                                // We'll read a u16 (big-endian)
-                                // Some DFF variants store more info; here we just read channel count
-                                let ch_count = self.file.read_u16::<BigEndian>()?;
-                                channels = Some(ch_count as u32);
-                                // skip the rest of the sub-chunk if any
-                                let skip = sub_size as i64 - 2;
-                                if skip > 0 {
-                                    self.file.seek(SeekFrom::Current(skip))?;
+                            match &sub_id {
+                                b"FS  " => {
+                                    // sample rate (big-endian u32)
+                                    if sub_size >= 4 {
+                                        let sr = self.file.read_u32::<BigEndian>()?;
+                                        sample_rate_hz = Some(sr);
+                                    } else {
+                                        // invalid FS subchunk: skip
+                                        self.file.seek(SeekFrom::Start(sub_payload_start + sub_size))?;
+                                    }
+                                }
+                                b"CHNL" => {
+                                    // channels (big-endian u16)
+                                    if sub_size >= 2 {
+                                        let ch = self.file.read_u16::<BigEndian>()?;
+                                        channels = Some(ch);
+                                    } else {
+                                        self.file.seek(SeekFrom::Start(sub_payload_start + sub_size))?;
+                                    }
+                                }
+                                b"CMPR" => {
+                                    // compression id (4 bytes), we accept only "DSD "
+                                    if sub_size >= 4 {
+                                        let mut cmp = [0u8; 4];
+                                        self.file.read_exact(&mut cmp)?;
+                                        if &cmp != b"DSD " {
+                                            return Err(io::Error::new(io::ErrorKind::InvalidData, "unsupported CMPR (not DSD)"));
+                                        }
+                                    } else {
+                                        return Err(io::Error::new(io::ErrorKind::InvalidData, "invalid CMPR chunk"));
+                                    }
+                                }
+                                _ => {
+                                    // ignore unknown subchunk
                                 }
                             }
-                            b"CMPR" => {
-                                // compression id: 4 bytes text (e.g. "DSD " for raw)
-                                let mut comp = [0u8; 4];
-                                self.file.read_exact(&mut comp)?;
-                                if &comp != b"DSD " {
-                                    return Err(io::Error::new(
-                                        io::ErrorKind::InvalidData,
-                                        "compressed DFF not supported",
-                                    ));
-                                }
-                                let skip = sub_size as i64 - 4;
-                                if skip > 0 {
-                                    self.file.seek(SeekFrom::Current(skip))?;
-                                }
-                            }
-                            _ => {
-                                // unknown sub-chunk: skip
-                                self.file.seek(SeekFrom::Current(sub_size as i64))?;
-                            }
+
+                            // subchunk payloads are padded to even length per spec:
+                            // padded = (sub_size + 1) & ~1
+                            let padded = (sub_size + 1) & !1u64;
+                            self.file.seek(SeekFrom::Start(sub_payload_start + padded))?;
                         }
+                    } else {
+                        // not a SND PROP variant - skip PROP payload (padded)
+                        let padded = (chunk_size + 1) & !1u64;
+                        self.file.seek(SeekFrom::Start(chunk_payload_start + padded))?;
                     }
-                    // ensure file cursor at end of PROP
-                    self.file.seek(SeekFrom::Start(prop_end))?;
                 }
+
                 b"DSD " => {
-                    // data chunk: remember offset and size
-                    let data_pos = self.file.seek(SeekFrom::Current(0))?;
-                    data_offset = data_pos;
-                    data_chunk_size = chunk_size;
-                    // move file cursor past data chunk (leave positioned at start of data)
-                    // do NOT seek past it — we want to start reading from here later
+                    // Found audio chunk
+                    found_dsd = true;
+                    dsd_chunk_size = chunk_size;
+                    // data_start points at the beginning of the audio payload
+                    self.data_start = self.file.seek(SeekFrom::Current(0))?;
+                    // break: we have what we need to prepare decoding
                     break;
                 }
+
                 _ => {
-                    // skip unknown chunk
-                    self.file.seek(SeekFrom::Current(chunk_size as i64))?;
+                    // skip unknown chunk payload (padded to even)
+                    let padded = (chunk_size + 1) & !1u64;
+                    self.file.seek(SeekFrom::Start(chunk_payload_start + padded))?;
                 }
             }
         }
 
-        if data_offset == 0 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "DFF missing DSD chunk",
-            ));
+        if !found_dsd {
+            return Err(io::Error::new(io::ErrorKind::InvalidData, "DSD chunk not found"));
         }
 
-        // fill format
-        if let Some(fs) = sampling_rate {
-            format.sampling_rate = fs;
-        } else {
-            format.sampling_rate = 2822400;
-        }
-        if let Some(ch) = channels {
-            format.num_channels = ch;
-        } else {
-            format.num_channels = 2;
-        }
+        // require CHNL and FS
+        let channels = channels.ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "CHNL missing"))?;
+        let fs = sample_rate_hz.ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "FS missing"))?;
 
-        // DFF typically uses MSB-first bit order; keep is_lsb_first false
-        format.is_lsb_first = false;
-        self.is_msb_first = true;
+        // Fill format and internal fields
+        format.num_channels = channels as u32;
+        self.ch = channels as usize;
+        format.sampling_rate = fs;
 
-        // compute total samples (frames per channel)
-        // DSD chunk contains raw bytes (all channels combined). total bits = data_chunk_size * 8
-        // frames per channel = total_bits / num_channels
-        let total_bits = data_chunk_size.saturating_mul(8);
-        self.total_samples = if format.num_channels > 0 {
-            total_bits / (format.num_channels as u64)
-        } else {
-            0
-        };
-        format.total_samples = self.total_samples;
+        // total_frames = chunk_size / channels (1 byte per channel per frame)
+        let total_frames = dsd_chunk_size / (self.ch as u64);
+        format.total_samples = total_frames; // samples == frames per channel
+        self.total_frames = total_frames;
 
-        // store data info
-        self.data_start = data_offset;
-        self.data_size = data_chunk_size;
-
-        // choose a blocksize: use 4096 bytes per channel as default; you may change
-        self.blocksize = 4096;
-        // allocate read buffer. If planar: we'll read blocksize * channels
-        self.buf.resize(self.blocksize * (self.ch.max(1)), 0);
-
-        // set internal channel count
-        self.ch = format.num_channels as usize;
-
-        // position file at start of data
-        self.file.seek(SeekFrom::Start(self.data_start))?;
-        self.pos = 0;
-        self.filled = 0;
-        self.read_samples = 0;
+        // allocate buffer: block_frames * channels bytes
+        self.buf.resize(self.block_frames * self.ch, 0);
 
         Ok(())
     }
 
     fn read(&mut self, data: &mut [&mut [u8]], bytes_per_channel: usize) -> io::Result<usize> {
-        // The read behaviour depends on `planar`:
-        // - planar=true: we read channel0 block then channel1 block ... (per-channel blocks)
-        //   To be compatible with your DSFReader semantics, we will fill internal buf with blocksize*ch
-        //   and then copy from buf[channel_block + pos .. +size] into per-channel dest buffers.
-        // - planar=false: we treat bytes as sample-interleaved: [ch0, ch1, ch0, ch1, ...]
-        //
-        // This gives you a switch to try both layouts.
-
-        let mut read_bytes = 0usize;
-        let mut want = bytes_per_channel;
-
-        if self.planar {
-            // we mimic DSFReader behaviour: read channel-blocks into buf then split
-            while want > 0 {
-                if self.pos == self.filled {
-                    // read up to blocksize * channels bytes
-                    let to_read = self.blocksize * self.ch;
-                    self.buf.resize(to_read, 0);
-                    let n = self.file.read(&mut self.buf)?;
-                    if n == 0 {
-                        return Ok(read_bytes);
-                    }
-                    // filled means bytes per channel available
-                    self.filled = n / self.ch;
-                    self.pos = 0;
-                }
-
-                let available = self.filled - self.pos;
-                let size = available.min(want);
-                for i in 0..self.ch {
-                    let src_offset = self.blocksize * i + self.pos;
-                    let src = &self.buf[src_offset..src_offset + size];
-                    let dst = &mut data[i][read_bytes..read_bytes + size];
-                    dst.copy_from_slice(src);
-                }
-                self.pos += size;
-                want -= size;
-                read_bytes += size;
-            }
-        } else {
-            // interleaved mode: we need to read  (bytes_per_channel * channels) bytes and split them
-            // We will read into a temp buffer of size want * ch (or blocksize * ch)
-            // To avoid realloc every call, reuse self.buf
-            while want > 0 {
-                let to_read_total = (want * self.ch).min(self.blocksize * self.ch);
-                self.buf.resize(to_read_total, 0);
-                let n = self.file.read(&mut self.buf)?;
-                if n == 0 {
-                    return Ok(read_bytes);
-                }
-                // n is total bytes read (interleaved), so we have n/ch bytes per channel (maybe truncated)
-                let bytes_per_ch_available = n / self.ch;
-                for i in 0..self.ch {
-                    let mut dst_off = read_bytes;
-                    let mut src_off = i;
-                    let dst = &mut data[i];
-                    // copy bytes_per_ch_available bytes per channel
-                    for _ in 0..bytes_per_ch_available {
-                        dst[dst_off] = self.buf[src_off];
-                        dst_off += 1;
-                        src_off += self.ch; // move to next sample for this channel
-                    }
-                }
-                read_bytes += bytes_per_ch_available;
-                // continue until want satisfied
-                want = want.saturating_sub(bytes_per_ch_available);
-            }
+        // Mirror C++ decode loop semantics: produce bytes_per_channel bytes per channel
+        if self.ch == 0 {
+            return Ok(0);
+        }
+        if data.len() < self.ch {
+            return Err(io::Error::new(io::ErrorKind::InvalidInput, "not enough channel buffers"));
         }
 
-        // update read_samples: we count bits (bytes_read * 8)
-        self.read_samples = self.read_samples.saturating_add((read_bytes as u64) * 8);
-        Ok(read_bytes)
+        // `written` is how many bytes per channel we've written so far
+        let mut written = 0usize;
+
+        while written < bytes_per_channel {
+            // refill internal buffer if exhausted
+            if self.pos_frames == self.filled_frames {
+                // frames to read in this pass (try to fill block_frames but at least enough to fulfill request)
+                let frames_to_read = (bytes_per_channel - written).min(self.block_frames);
+                let bytes_to_read = frames_to_read * self.ch;
+                self.buf.resize(bytes_to_read, 0);
+                let n = self.file.read(&mut self.buf)?;
+                if n == 0 {
+                    // EOF
+                    return Ok(written);
+                }
+                // n should be multiple of channels; compute frames
+                self.filled_frames = n / self.ch;
+                self.pos_frames = 0;
+            }
+
+            let available_frames = self.filled_frames - self.pos_frames;
+            let need_frames = bytes_per_channel - written;
+            let take_frames = available_frames.min(need_frames);
+
+            // deinterleave `take_frames` frames from buf into channel slices
+            // frames are interleaved: for each frame f: byte0..byte(ch-1)
+            for ch_idx in 0..self.ch {
+                let dst = &mut data[ch_idx][written..written + take_frames];
+                // copy bytes for this channel from each frame with stride
+                let mut dst_i = 0usize;
+                let mut src_offset = self.pos_frames * self.ch + ch_idx;
+                for _ in 0..take_frames {
+                    dst[dst_i] = self.buf[src_offset];
+                    dst_i += 1;
+                    src_offset += self.ch;
+                }
+            }
+
+            self.pos_frames += take_frames;
+            written += take_frames;
+            self.read_frames = self.read_frames.saturating_add(take_frames as u64);
+        }
+
+        Ok(written)
     }
 
     fn seek_percent(&mut self, percent: f64) -> io::Result<()> {
-        if percent < 0.0 || percent > 1.0 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "percent out of range",
-            ));
+        if !(0.0..=1.0).contains(&percent) {
+            return Err(io::Error::new(io::ErrorKind::InvalidInput, "percent out of range"));
         }
-        let target_sample = (self.total_samples as f64 * percent) as u64;
-        self.seek_samples(target_sample)
+        let target_frame = (self.total_frames as f64 * percent) as u64;
+        self.seek_samples(target_frame)
     }
 
     fn seek_samples(&mut self, sample_index: u64) -> io::Result<()> {
-        // compute byte position in DSD chunk
-        // total bits = sample_index * channels (1 bit per channel per sample)
-        let total_bits = sample_index.saturating_mul(self.ch as u64);
-        let total_bytes = total_bits / 8;
-        // align to block boundary if planar, or to 1 byte if interleaved
-        let aligned_bytes = if self.planar {
-            // align to blocksize*ch boundary (same logic as DSF)
-            ((total_bytes) / ((self.blocksize * self.ch) as u64))
-                * ((self.blocksize * self.ch) as u64)
-        } else {
-            // interleaved: align to any byte
-            total_bytes
-        };
-        let offset = self.data_start + aligned_bytes;
+        // In DFF: 1 frame => 1 byte per channel; byte offset = sample_index * channels
+        let byte_offset = sample_index.checked_mul(self.ch as u64)
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "seek overflow"))?;
+        let offset = self.data_start + byte_offset;
         self.file.seek(SeekFrom::Start(offset))?;
-        self.read_samples = aligned_bytes * 8;
-        self.pos = 0;
-        self.filled = 0;
+        self.read_frames = sample_index;
+        self.pos_frames = 0;
+        self.filled_frames = 0;
         Ok(())
     }
 
     fn get_position_frames(&self) -> u64 {
-        if self.ch == 0 {
-            return 0;
-        }
-        self.read_samples / (self.ch as u64)
+        self.read_frames
     }
 
     fn get_position_percent(&self) -> f64 {
-        if self.total_samples == 0 {
-            return 0.0;
+        if self.total_frames == 0 {
+            0.0
+        } else {
+            (self.get_position_frames() as f64 / self.total_frames as f64).min(1.0)
         }
-        (self.get_position_frames() as f64 / self.total_samples as f64).min(1.0)
     }
 }
