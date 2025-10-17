@@ -1,12 +1,13 @@
 package com.kgaft.VoidAudioPlayer.Ui.Album;
 
+import com.kgaft.VoidAudioPlayer.Model.MAlbumUiObject;
 import com.kgaft.VoidAudioPlayer.Ui.Util.ImageInflater;
 import com.kgaft.VoidAudioPlayer.Verbose.Album;
 
 import javax.swing.*;
 import java.awt.*;
 
-public class AlbumCard extends JPanel {
+public class AlbumCard extends JPanel implements MAlbumUiObject {
     private Album album;
     private ImageIcon albumIcon;
     private JLabel coverLabel;
@@ -32,5 +33,15 @@ public class AlbumCard extends JPanel {
         verbosePanel.add(artistLabel);
         add(verbosePanel, BorderLayout.SOUTH);
         invalidate();
+    }
+
+    @Override
+    public String getAlbumName() {
+        return album.getName();
+    }
+
+    @Override
+    public Album getBaseAlbum() {
+        return album;
     }
 }
