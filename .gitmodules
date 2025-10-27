@@ -1,0 +1,6 @@
+[submodule "src/main/cxx/modules/asio/asio-src"]
+	path = src/main/cxx/modules/asio/asio-src
+	url = https://github.com/audiosdk/asio
+[submodule "rust_modules/torznab-rs"]
+	path = rust_modules/torznab-rs
+	url = https://github.com/KGAFT/torznab-rs-f

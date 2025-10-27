@@ -40,7 +40,7 @@ struct Buffers {
     block_size: usize,
     alsa_buffer_size: usize,
 }
-
+#[cfg(target_os = "linux")]
 impl Buffers {
     pub fn new(alsa_buffer_size: usize, block_size: usize) -> Self {
         Self {
@@ -117,6 +117,7 @@ impl Buffers {
     }
 }
 
+#[cfg(target_os = "linux")]
 pub struct DsdPlayer {
     playback_handle: *mut alsa::snd_pcm_t,
     hw_params: *mut alsa::snd_pcm_hw_params_t,
@@ -129,7 +130,7 @@ pub struct DsdPlayer {
     stoped: AtomicBool,
     is_playing: AtomicBool,
 }
-
+#[cfg(target_os = "linux")]
 impl DsdPlayer {
     pub unsafe fn support_dsd(device_name: *const c_char) -> bool {
         let mut handle: *mut alsa::snd_pcm_t = std::ptr::null_mut();
@@ -478,7 +479,7 @@ impl DsdPlayer {
         }
     }
 }
-
+#[cfg(target_os = "linux")]
 impl Drop for DsdPlayer {
     fn drop(&mut self) {
         unsafe {

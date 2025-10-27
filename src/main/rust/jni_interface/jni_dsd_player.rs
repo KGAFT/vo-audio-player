@@ -1,8 +1,9 @@
+#[cfg(target_os = "linux")]
 use crate::operative::dsd_player::DsdPlayer;
 use jni::JNIEnv;
 use jni::objects::{JClass, JObject, JString, JValue};
 use jni::sys::{jboolean, jfloat, jlong, jobject};
-
+#[cfg(target_os = "linux")]
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_PlayerDsd_enumerateSupportedDevices(
     mut env: JNIEnv,
@@ -24,7 +25,7 @@ pub extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_PlayerDsd_enumerate
     });
     j_devices.as_raw()
 }
-
+#[cfg(target_os = "linux")]
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_PlayerDsd_initializePlayer(
     mut env: JNIEnv,
@@ -35,7 +36,7 @@ pub extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_PlayerDsd_initializ
     let dsd_player = DsdPlayer::new(device_name.to_str().unwrap());
     Box::into_raw(Box::from(dsd_player)) as jlong
 }
-
+#[cfg(target_os = "linux")]
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_PlayerDsd_destroyPlayer(
     mut env: JNIEnv,
@@ -46,7 +47,7 @@ pub extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_PlayerDsd_destroyPl
         drop(Box::from_raw(handle as *mut DsdPlayer));
     }
 }
-
+#[cfg(target_os = "linux")]
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_PlayerDsd_loadTrack(
     mut env: JNIEnv,
@@ -60,7 +61,7 @@ pub extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_PlayerDsd_loadTrack
     println!("{}", path_str);
     player.load_new_track(path_str);
 }
-
+#[cfg(target_os = "linux")]
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_PlayerDsd_playOnCurrentThread(
     env: JNIEnv,
@@ -70,7 +71,7 @@ pub extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_PlayerDsd_playOnCur
     let player = unsafe{(handle as *mut DsdPlayer).as_mut().unwrap()};
     player.play_on_current_thread();
 }
-
+#[cfg(target_os = "linux")]
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_PlayerDsd_seekTrack(
     env: JNIEnv,
@@ -81,7 +82,7 @@ pub extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_PlayerDsd_seekTrack
     let mut player = unsafe{(handle as *mut DsdPlayer).as_mut().unwrap()};
     player.seek(percent as f64).is_ok() as jboolean
 }
-
+#[cfg(target_os = "linux")]
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_PlayerDsd_getTrackLength(
     env: JNIEnv,
@@ -90,7 +91,7 @@ pub extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_PlayerDsd_getTrackL
 ) -> jlong {
     0
 }
-
+#[cfg(target_os = "linux")]
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_PlayerDsd_getTrackPos(
     env: JNIEnv,
@@ -100,7 +101,7 @@ pub extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_PlayerDsd_getTrackP
     let player = unsafe{(handle as *mut DsdPlayer).as_mut().unwrap()};
     player.get_current_position_percents() as jfloat
 }
-
+#[cfg(target_os = "linux")]
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_PlayerDsd_setPlaying(
     env: JNIEnv,
@@ -115,7 +116,7 @@ pub extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_PlayerDsd_setPlayin
         player.pause();
     }
 }
-
+#[cfg(target_os = "linux")]
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_PlayerDsd_isPlaying(
     env: JNIEnv,
@@ -125,7 +126,7 @@ pub extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_PlayerDsd_isPlaying
     let player = unsafe{(handle as *mut DsdPlayer).as_mut().unwrap()};
     player.is_playing() as jboolean
 }
-
+#[cfg(target_os = "linux")]
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_PlayerDsd_stop(
     env: JNIEnv,
