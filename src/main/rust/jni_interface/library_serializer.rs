@@ -1,16 +1,15 @@
 use crate::j_objects::album::{Album, Library};
 use bincode::config::{Configuration, Fixint, LittleEndian};
 use jni::JNIEnv;
-use jni::objects::{JByteArray, JClass, JList, JObject, JString, JValue};
+use jni::objects::{JByteArray, JClass, JObject, JString, JValue};
 use jni::sys::{jbyteArray, jobject};
 use std::fs::File;
 use std::io::{BufReader, BufWriter, Write};
-
 pub static BINCODE_CONFIG: Configuration<LittleEndian, Fixint> = bincode::config::standard()
     .with_little_endian()
     .with_fixed_int_encoding()
     .with_no_limit();
-
+#[deprecated]
 unsafe fn albums_from_jni(env: &mut JNIEnv, albums: JObject) -> Library {
     let size: i32 = env
         .call_method(albums.as_ref(), "size", "()I", &[])
@@ -39,12 +38,12 @@ unsafe fn albums_from_jni(env: &mut JNIEnv, albums: JObject) -> Library {
         albums: albums_list,
     }
 }
-
+#[deprecated]
 unsafe fn serialize_albums(env: &mut JNIEnv, albums: JObject) -> Vec<u8> {
     let library = albums_from_jni(env, albums);
     bincode::serde::encode_to_vec(&library, BINCODE_CONFIG).expect("Failed to encode library")
 }
-
+#[deprecated]
 unsafe fn library_to_jlist(env: &mut JNIEnv, mut library: Library) -> jobject{
     let arraylist_class = env.find_class("java/util/ArrayList").unwrap();
 
@@ -53,7 +52,7 @@ unsafe fn library_to_jlist(env: &mut JNIEnv, mut library: Library) -> jobject{
 
     // Add each element
     while let Some(album) = library.albums.pop() {
-        let album = JObject::from_raw(album.rust_album_to_java(env));
+        let album = unsafe{JObject::from_raw(album.rust_album_to_java(env))};
         env.call_method(
             list_obj.as_ref(),
             "add",
@@ -65,7 +64,7 @@ unsafe fn library_to_jlist(env: &mut JNIEnv, mut library: Library) -> jobject{
 
     list_obj.as_raw()
 }
-
+#[deprecated]
 #[unsafe(no_mangle)]
 pub unsafe extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_LibrarySerializer_serialize(
     mut env: JNIEnv,
@@ -77,7 +76,7 @@ pub unsafe extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_LibrarySeria
         .expect("Failed to create array")
         .as_raw()
 }
-
+#[deprecated]
 #[unsafe(no_mangle)]
 pub unsafe extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_LibrarySerializer_deserialize(
     mut env: JNIEnv,
@@ -85,7 +84,7 @@ pub unsafe extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_LibrarySeria
     data: JByteArray,
 ) -> jobject {
     let data = env.convert_byte_array(data).unwrap();
-    let mut library = bincode::serde::decode_from_slice::<
+    let library = bincode::serde::decode_from_slice::<
         Library,
         Configuration<LittleEndian, Fixint>,
     >(data.as_slice(), BINCODE_CONFIG)
@@ -93,7 +92,7 @@ pub unsafe extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_LibrarySeria
     .0;
     library_to_jlist(&mut env, library)
 }
-
+#[deprecated]
 #[unsafe(no_mangle)]
 pub unsafe extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_LibrarySerializer_serializeAndSaveToFile(
     mut env: JNIEnv,
@@ -104,13 +103,13 @@ pub unsafe extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_LibrarySeria
     let binding = env.get_string(&destination).unwrap();
     let destination = binding.to_str().unwrap();
     let albums = albums_from_jni(&mut env, albums);
-    let mut file = File::create(destination).unwrap();
+    let file = File::create(destination).unwrap();
     let mut writer = BufWriter::new(file);
     bincode::serde::encode_into_std_write(albums, &mut writer, BINCODE_CONFIG)
         .expect("Failed to serialize");
     writer.flush().unwrap();
 }
-
+#[deprecated]
 #[unsafe(no_mangle)]
 pub unsafe extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_LibrarySerializer_deserializeFromFile(
     mut env: JNIEnv,
@@ -119,7 +118,7 @@ pub unsafe extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_LibrarySeria
 ) -> jobject {
     let binding = env.get_string(&source).unwrap();
     let source = binding.to_str().unwrap();
-    let mut file = File::open(source).unwrap();
+    let file = File::open(source).unwrap();
     let mut reader = BufReader::new(file);
     let library: Library = bincode::serde::decode_from_std_read(&mut reader, BINCODE_CONFIG).unwrap();
     library_to_jlist(&mut env, library)

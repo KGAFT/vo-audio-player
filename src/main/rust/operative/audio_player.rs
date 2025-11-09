@@ -1,6 +1,5 @@
 use gst::prelude::*;
 use gstreamer as gst;
-use gstreamer::MessageView;
 use std::io;
 use std::io::Write;
 use std::sync::atomic::AtomicBool;
@@ -51,7 +50,7 @@ impl AudioPlayer {
             .iter()
             .filter_map(|dev| {
                 let name = dev.display_name();
-                let device_class = dev.device_class();
+                //let device_class = dev.device_class();
                 let device_str = dev
                     .properties()
                     .and_then(|props| {
@@ -123,7 +122,7 @@ impl AudioPlayer {
     }
 
     pub fn is_playing(&self) -> bool {
-        let playbin_state = self.playbin.state(None).1;
+        //let playbin_state = self.playbin.state(None).1;
         self.playing.load(Relaxed) && !self.eos.load(Relaxed)
     }
 

@@ -1,10 +1,6 @@
-use crate::util::text_decoder::binary_to_text;
 use jni::JNIEnv;
 use jni::objects::{JObject, JString, JValue};
 use jni::sys::jobject;
-use std::collections::HashMap;
-use std::fs;
-use std::path::Path;
 use std::time::Duration;
 
 
@@ -93,12 +89,14 @@ pub unsafe fn cue_album_to_java(
 
     for song in &album.songs {
         let j_song = cue_song_to_java(env, song)?;
-        env.call_method_unchecked(
-            &arraylist_obj,
-            add_method_id,
-            jni::signature::ReturnType::Primitive(jni::signature::Primitive::Boolean),
-            &[JValue::Object(&JObject::from_raw(j_song)).as_jni()],
-        )?;
+        unsafe{
+            env.call_method_unchecked(
+                &arraylist_obj,
+                add_method_id,
+                jni::signature::ReturnType::Primitive(jni::signature::Primitive::Boolean),
+                &[JValue::Object(&JObject::from_raw(j_song)).as_jni()],
+            )?;
+        }
     }
 
     // Build CueAlbum

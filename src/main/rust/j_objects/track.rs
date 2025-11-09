@@ -4,10 +4,30 @@ use jni::JNIEnv;
 use jni::objects::{JObject, JValue};
 use jni::sys::{jbyte, jint, jlong, jobject};
 use lofty::file::{AudioFile, TaggedFileExt};
+use lofty::id3::v1::Id3v1Tag;
+use lofty::id3::v2::Id3v2Tag;
 use lofty::tag::Accessor;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
+use std::collections::HashMap;
+use std::io::{BufReader, Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
+use std::{fs, io};
+use std::fs::File;
+use std::io::ErrorKind::WouldBlock;
+use std::time::Duration;
+use byteorder::{BigEndian, ReadBytesExt};
+use gstreamer::glib::GString;
+use gstreamer::query::Uri;
+use gstreamer_pbutils::gst;
+
+#[derive(Debug, Default)]
+pub struct DsdiffMetadata {
+    /// Native tags, e.g., DIAR, DITI
+    pub tags: HashMap<String, String>,
+    /// Optional raw ID3 chunk
+    pub id3_raw: Option<Vec<u8>>,
+}
 
 #[derive(Serialize, Deserialize)]
 pub struct Track {
@@ -27,29 +47,134 @@ pub struct Track {
 }
 
 impl Track {
+
+    pub fn gst_new(path: &str, env: &mut JNIEnv) -> Option<jobject> {
+        use gstreamer_pbutils::gst::Tag;
+        // Initialize GStreamer (if not already initialized)
+        let _ = gst::init();
+        let uri = gst::glib::filename_to_uri(path, None).unwrap();
+
+        let discoverer = match gstreamer_pbutils::Discoverer::new(gst::ClockTime::from_seconds(5)) {
+            Ok(d) => d,
+            Err(_) => {
+                eprintln!("Discoverer failed");
+                return None
+            },
+        };
+
+        let info = match discoverer.discover_uri(&uri) {
+            Ok(i) => i,
+            Err(_) => {
+                eprintln!("Info failed {}", uri);
+                return None
+            },
+        };
+
+        let tags = info.tags();
+        if tags.is_none() {
+            eprintln!("Tags failed!");
+            return None;
+        }
+        let tags = tags.unwrap();
+
+        let file_name = Path::new(path)
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .to_string();
+
+        // Helper function to get tag or fallback
+        let get_tag = |tag| unsafe {
+            use gstreamer::glib::value::FromValue;
+            use gstreamer::glib::value::ToValue;
+            let res = tags.generic(tag);
+            if res.is_none(){
+                return None;
+            }
+            let res = res.unwrap().to_value();
+            Some(GString::from_value(&res).to_string())
+        };
+
+        let title = get_tag(gst::tags::Title::TAG_NAME).unwrap_or(file_name.clone());
+        let album = get_tag(gst::tags::Album::TAG_NAME).unwrap_or(Path::new(path).parent().unwrap().file_name().unwrap().to_str().unwrap().to_string());
+        let artist = get_tag(gst::tags::Artist::TAG_NAME).unwrap_or_default();
+        let genre = get_tag(gst::tags::Genre::TAG_NAME).unwrap_or_default();
+
+        // Duration and bitrate
+        let duration_ms = info.duration().unwrap_or_default().mseconds() as jlong;
+        let overall_bitrate = info.audio_streams()[0].bitrate() as jint;
+
+        // Create Java strings
+        let j_title = env.new_string(title).unwrap();
+        let j_album = env.new_string(album).unwrap();
+        let j_artist = env.new_string(artist).unwrap();
+        let j_genre = env.new_string(genre).unwrap();
+        let j_path = env.new_string(path).unwrap();
+
+        // Find Track class and constructor
+        let track_class = env
+            .find_class("com/kgaft/VoidAudioPlayer/Verbose/Track")
+            .expect("Failed to find Track class");
+
+        let track_obj = env
+            .new_object(track_class, "()V", &[])
+            .expect("Failed to create Track object");
+
+        // Set string fields
+        let string_fields = [
+            ("name", &j_title),
+            ("albumName", &j_album),
+            ("artistName", &j_artist),
+            ("genre", &j_genre),
+            ("path", &j_path),
+        ];
+        for (field_name, value) in string_fields.iter() {
+            env.set_field(track_obj.as_ref(), *field_name, "Ljava/lang/String;", JValue::from(value))
+                .unwrap();
+        }
+
+        // Set numeric fields
+        env.set_field(track_obj.as_ref(), "durationMs", "J", JValue::Long(duration_ms))
+            .unwrap();
+        env.set_field(track_obj.as_ref(), "overallBitrate", "I", JValue::Int(overall_bitrate))
+            .unwrap();
+
+        // Set default values for fields we can’t extract from GStreamer
+        env.set_field(track_obj.as_ref(), "year", "I", JValue::Int(0)).unwrap();
+        env.set_field(track_obj.as_ref(), "bitDepth", "B", JValue::Byte(0)).unwrap();
+        env.set_field(track_obj.as_ref(), "channels", "B", JValue::Byte(0)).unwrap();
+
+        Some(track_obj.as_raw())
+    }
+
     pub fn new(path: &str, env: &mut JNIEnv) -> jobject {
         // Read track metadata using lofty
         let path_buf = PathBuf::from(path);
         let f_name = path_buf.file_name().unwrap().to_str().unwrap().to_string();
+
         if f_name.ends_with(".dsf") || f_name.ends_with(".dff") || f_name.ends_with(".dsd") {
-            return Self::extract_dsd_info(path, env);
+            let gst_res =  Self::gst_new(path, env);
+            if gst_res.is_none(){
+                eprintln!("gst failed {}", path);
+            }
+            return gst_res.unwrap_or(Self::empty_track(path, env));
         }
         let tagged_file = lofty::read_from_path(path);
         if tagged_file.is_err() {
             println!("Failed to read track info: {}", path);
-            return Self::extract_dsd_info(path, env);
+            return Self::gst_new(path, env).unwrap_or(Self::empty_track(path, env));
         }
         let tagged_file = tagged_file.unwrap();
 
         let properties = tagged_file.properties();
         let info = tagged_file.primary_tag();
         if info.is_none() {
-            return Self::empty_track(path, env);
+            return Self::gst_new(path, env).unwrap_or(Self::empty_track(path, env));
         }
         let info = info.unwrap();
         // Create Java strings
         let album_name = env
-            .new_string(info.album().unwrap_or(Cow::from("")))
+            .new_string(info.album().unwrap_or(Path::new(path).parent().unwrap().file_name().unwrap().to_string_lossy()))
             .unwrap();
         let artist_name = env
             .new_string(info.artist().unwrap_or(Cow::from("")))
@@ -290,20 +415,90 @@ impl Track {
         })
     }
 
-    pub fn extract_dsd_info(path: &str, env: &mut JNIEnv) -> jobject {
-
+    pub fn try_get_dsd_tag_trad(path: &str) -> Option<Tag> {
         // Parse DSF file
         let dsf = match DsfFile::open(Path::new(path)) {
             Ok(f) => f,
-            Err(_) => return Self::empty_track(path, env),
+            Err(_) => {
+                eprintln!("Failed to open dsd file {}", path);
+                return None;
+            }
         };
         // Require an ID3 tag
         let tag: &Tag = match dsf.id3_tag() {
             Some(t) => t,
-            None => return Self::empty_track(path, env),
+            None => {
+                eprintln!("Failed to read dsd file id3 tag {}", path);
+                return None;
+            }
+        };
+        Some(tag.clone())
+    }
+    pub fn extract_dff_metadata(path: &str) -> io::Result<DsdiffMetadata> {
+        let mut file = File::open(path)?;
+        let mut decoder = iff_rs::parse_iff(file);
+
+
+        let mut metadata = DsdiffMetadata {
+            tags: HashMap::new(),
+            id3_raw: None,
         };
 
-        let fmt = dsf.fmt_chunk();
+        if decoder.is_err(){
+            eprintln!("Failed to open file {}", path);
+            return Ok(metadata);
+        }
+        let mut decoder =decoder.unwrap();
+        let mut found_audio = false;
+
+        for chunk in decoder.chunks.iter() {
+            let size = chunk.data.len() as u64;
+            let id_bytes = chunk.id.to_ne_bytes() ;
+            if id_bytes.as_slice() == b"DSD " {
+                // audio chunk
+                found_audio = true;
+            } else if found_audio {
+                // metadata chunks after audio
+                if id_bytes.as_slice() == b"DIAR" {
+                    let s = crate::util::text_decoder::binary_to_text(chunk.data.as_slice()).trim().to_string();
+                    metadata.tags.insert("artist".into(), s);
+                } else if id_bytes.as_slice() == b"DITI" {
+                    let s = crate::util::text_decoder::binary_to_text(chunk.data.as_slice()).trim().to_string();
+                    metadata.tags.insert("title".into(), s);
+                } else if id_bytes.as_slice() == b"ID3 " {
+                    metadata.id3_raw = Some(chunk.data.clone());
+                    break; // ID3 takes priority
+                }
+            }
+
+        }
+
+        Ok(metadata)
+    }
+
+    fn normalize_dff_tag(id: &str) -> Option<&'static str> {
+        match id {
+            "DIAR" => Some("artist"),
+            "DITI" => Some("title"),
+            "DIAL" => Some("album"),
+            "DIGN" => Some("genre"),
+            "DICR" => Some("copyright"),
+            "DIFC" => Some("comment"),
+            _ => None,
+        }
+    }
+
+    pub fn extract_dsd_info(path: &str, env: &mut JNIEnv) -> jobject {
+        let mut tag = Tag::new();
+        let mut tag_res = Self::try_get_dsd_tag_trad(path);
+        if tag_res.is_none() {
+            eprintln!("Opening in another way");
+            if tag_res.is_none() {
+                eprintln!("No way to get to dsd data: {}", path);
+                return Track::empty_track(path, env);
+            }
+            tag = tag_res.unwrap();
+        }
 
         let path_buf = PathBuf::from(path);
         let f_name = path_buf.file_name().unwrap().to_str().unwrap().to_string();
@@ -317,9 +512,9 @@ impl Track {
         let path_str = env.new_string(path).unwrap();
 
         // Numeric properties
-        let sample_rate: jint = fmt.sampling_frequency() as jint;
-        let channels: jbyte = fmt.channel_num() as jbyte;
-        let bit_depth: jbyte = fmt.bits_per_sample() as jbyte; // usually 1
+        let sample_rate: jint = 0 as jint;
+        let channels: jbyte = 0 as jbyte;
+        let bit_depth: jbyte = 1 as jbyte; // usually 1
         let year: jint = tag.year().unwrap_or(0) as jint;
 
         let duration: jlong = tag.duration().unwrap_or(0) as jlong;
@@ -409,7 +604,7 @@ impl Track {
 
         // Fill string fields with empty/path
         let string_fields = [
-            ("name", &empty_str),
+            ("name", &path_str),
             ("albumName", &empty_str),
             ("artistName", &empty_str),
             ("genre", &empty_str),

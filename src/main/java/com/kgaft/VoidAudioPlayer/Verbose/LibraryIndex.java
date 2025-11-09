@@ -45,7 +45,7 @@ public class LibraryIndex {
             trackDao = DaoManager.createDao(connection, Track.class);
             albumDao = DaoManager.createDao(connection, Album.class);
             artistDao = DaoManager.createDao(connection, Artist.class);
-           // indexedDirectoryDao = DaoManager.createDao(connection, IndexedDirectory.class);
+            indexedDirectoryDao = DaoManager.createDao(connection, IndexedDirectory.class);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -75,6 +75,33 @@ public class LibraryIndex {
             artists.add(artist);
         }
     }
+
+    private boolean checkDirectory(String path){
+        try {
+            Optional<IndexedDirectory> res = indexedDirectoryDao.queryForEq("path", path).stream().findAny();
+            if(res.isPresent()){
+                IndexedDirectory directory = res.get();
+                if(directory.recheckNeeded()){
+                    directory = new IndexedDirectory(directory.getPath());
+                    indexedDirectoryDao.createOrUpdate(directory);
+                    return true;
+                }
+                return false;
+            } else {
+                IndexedDirectory directory = new IndexedDirectory(path);
+                indexedDirectoryDao.createOrUpdate(directory);
+                return true;
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return true;
+    }
+
+    private void findUncheckedDirectory(String path){
+
+    }
+
 
     public void addDirectory(String directory) {
         List<Album> albumList = new ArrayList<>();
@@ -115,6 +142,9 @@ public class LibraryIndex {
         });
 
         trackList.forEach(track -> {
+            if(track.getPath().endsWith(".dff")){
+                System.err.println(track.getAlbumName()+track.getPath());
+            }
             try {
                 trackDao.create(track);
             } catch (SQLException e) {

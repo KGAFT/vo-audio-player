@@ -30,12 +30,13 @@ public class Main {
     public static void main(String[] args) throws InterruptedException {
 
         LibraryIndex index = LibraryIndex.getInstance();
-        // index.addDirectory("/mnt/files2/Music");
+        //index.addDirectory("/mnt/hdd/Music");
         try {
             UIManager.setLookAndFeel(new FlatMacDarkLaf());
         } catch (Exception e) {
             e.printStackTrace();
         }
+
 
 
         List<DsdDeviceInfo> devices = MPlayer.enumerateDsdDevices();
@@ -46,6 +47,8 @@ public class Main {
         Scanner scanner = new Scanner(System.in);
         DsdDeviceInfo name = devices.get(scanner.nextInt());
         MPlayer.initDsdDevice(name);
+
+
         PlayerWindow window = new PlayerWindow(index.getAlbums());
 
 

@@ -35,13 +35,14 @@ pub unsafe extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_Player_setDe
     device_name: JString,
 ) {
     let player = handle as *mut AudioPlayer;
-    let player = player.as_mut().unwrap();
+    
+    let player = unsafe{player.as_mut().unwrap()};
     player.set_output_device(env.get_string(&device_name).unwrap().to_str().unwrap());
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_Player_initializePlayer(
-    env: JNIEnv,
+    _: JNIEnv,
     _class: JClass,
 ) -> jlong {
     let player = Box::from(AudioPlayer::new());
@@ -56,30 +57,30 @@ pub unsafe extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_Player_loadT
     path: JString,
 ) {
     let player = handle as *mut AudioPlayer;
-    let player = player.as_mut().unwrap();
+    let player = unsafe{player.as_mut()}.unwrap();
     player.set_uri(env.get_string(&path).unwrap().to_str().unwrap())
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_Player_seekTrack(
-    mut env: JNIEnv,
+    _: JNIEnv,
     _class: JClass,
     handle: jlong,
     percent: jfloat,
 ) -> jboolean {
     let player = handle as *mut AudioPlayer;
-    let player = player.as_mut().unwrap();
+    let player = unsafe{player.as_mut()}.unwrap();
     player.seek_percent(percent as f64) as jboolean
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_Player_getTrackLength(
-    mut env: JNIEnv,
+    _: JNIEnv,
     _class: JClass,
     handle: jlong,
 ) -> jlong {
     let player = handle as *mut AudioPlayer;
-    let player = player.as_mut().unwrap();
+    let player = unsafe{player.as_mut()}.unwrap();
     player
         .duration()
         .unwrap_or_else(|| Duration::from_millis(0))
@@ -88,12 +89,12 @@ pub unsafe extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_Player_getTr
 
 #[unsafe(no_mangle)]
 pub unsafe extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_Player_pollEventsMain(
-    mut env: JNIEnv,
+    _: JNIEnv,
     _class: JClass,
     handle: jlong,
 ) {
     let player = handle as *mut AudioPlayer;
-    let player = player.as_mut().unwrap();
+    let player = unsafe{player.as_mut()}.unwrap();
     loop {
         player.poll_bus();
         sleep(Duration::from_millis(100));
@@ -102,12 +103,12 @@ pub unsafe extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_Player_pollE
 
 #[unsafe(no_mangle)]
 pub unsafe extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_Player_getTrackPos(
-    mut env: JNIEnv,
+    _: JNIEnv,
     _class: JClass,
     handle: jlong,
 ) -> jlong {
     let player = handle as *mut AudioPlayer;
-    let player = player.as_mut().unwrap();
+    let player = unsafe{player.as_mut()}.unwrap();
     player
         .position()
         .unwrap_or_else(|| Duration::from_millis(0))
@@ -116,24 +117,24 @@ pub unsafe extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_Player_getTr
 
 #[unsafe(no_mangle)]
 pub unsafe extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_Player_stop(
-    mut env: JNIEnv,
+    _: JNIEnv,
     _class: JClass,
     handle: jlong,
 ) {
     let player = handle as *mut AudioPlayer;
-    let player = player.as_mut().unwrap();
+    let player = unsafe{player.as_mut()}.unwrap();
     player.stop();
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_Player_setPlaying(
-    mut env: JNIEnv,
+    _: JNIEnv,
     _class: JClass,
     handle: jlong,
     playing: jboolean,
 ) {
     let player = handle as *mut AudioPlayer;
-    let player = player.as_mut().unwrap();
+    let player = unsafe{player.as_mut()}.unwrap();
     if playing != 0 {
         player.play()
     } else {
@@ -143,11 +144,11 @@ pub unsafe extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_Player_setPl
 
 #[unsafe(no_mangle)]
 pub unsafe extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_Player_isPlaying(
-    mut env: JNIEnv,
+    _: JNIEnv,
     _class: JClass,
     handle: jlong,
 ) -> jboolean {
     let player = handle as *mut AudioPlayer;
-    let player = player.as_mut().unwrap();
+    let player = unsafe{player.as_mut()}.unwrap();
     player.is_playing() as jboolean
 }

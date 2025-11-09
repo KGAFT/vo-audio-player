@@ -1,7 +1,10 @@
 #[cfg(target_os = "linux")]
-use crate::operative::dsd_player::DsdPlayer;
+use ndsd_playback::players::*;
+#[cfg(target_os = "linux")]
 use jni::JNIEnv;
+#[cfg(target_os = "linux")]
 use jni::objects::{JClass, JObject, JString, JValue};
+#[cfg(target_os = "linux")]
 use jni::sys::{jboolean, jfloat, jlong, jobject};
 #[cfg(target_os = "linux")]
 #[unsafe(no_mangle)]
@@ -9,7 +12,7 @@ pub extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_PlayerDsd_enumerate
     mut env: JNIEnv,
     _class: JClass,
 ) -> jobject {
-    let devices = DsdPlayer::enumerate_supported_devices();
+    let devices = enumerate_supported_devices();
     let arraylist_class = env.find_class("java/util/ArrayList").unwrap();
     let j_devices = env.new_object(arraylist_class, "()V", &[]).unwrap();
     devices.iter().for_each(|device| {
@@ -33,8 +36,8 @@ pub extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_PlayerDsd_initializ
     device_name: JString,
 ) -> jlong {
     let device_name = env.get_string(&device_name).unwrap();
-    let dsd_player = DsdPlayer::new(device_name.to_str().unwrap());
-    Box::into_raw(Box::from(dsd_player)) as jlong
+    let dsd_player = create_player(device_name.to_str().unwrap().parse().unwrap());
+    Box::into_raw(Box::new(dsd_player)) as * mut _ as jlong
 }
 #[cfg(target_os = "linux")]
 #[unsafe(no_mangle)]
@@ -44,7 +47,7 @@ pub extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_PlayerDsd_destroyPl
     handle: jlong
 ){
     unsafe {
-        drop(Box::from_raw(handle as *mut DsdPlayer));
+        drop(Box::from_raw(handle as *mut Box<dyn DSDPlayer>));
     }
 }
 #[cfg(target_os = "linux")]
@@ -55,7 +58,7 @@ pub extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_PlayerDsd_loadTrack
     handle: jlong,
     path: JString,
 ) {
-    let player = unsafe{(handle as *mut DsdPlayer).as_mut().unwrap()};
+    let player = unsafe{(handle as *mut Box<dyn DSDPlayer>).as_mut().unwrap()};
     let path = env.get_string(&path).unwrap();
     let path_str = path.to_str().unwrap();
     println!("{}", path_str);
@@ -68,7 +71,7 @@ pub extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_PlayerDsd_playOnCur
     _class: JClass,
     handle: jlong,
 ) {
-    let player = unsafe{(handle as *mut DsdPlayer).as_mut().unwrap()};
+    let player = unsafe{(handle as *mut Box<dyn DSDPlayer>).as_mut().unwrap()};
     player.play_on_current_thread();
 }
 #[cfg(target_os = "linux")]
@@ -79,7 +82,7 @@ pub extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_PlayerDsd_seekTrack
     handle: jlong,
     percent: jfloat,
 ) -> jboolean {
-    let mut player = unsafe{(handle as *mut DsdPlayer).as_mut().unwrap()};
+    let mut player = unsafe{(handle as *mut Box<dyn DSDPlayer>).as_mut().unwrap()};
     player.seek(percent as f64).is_ok() as jboolean
 }
 #[cfg(target_os = "linux")]
@@ -98,7 +101,7 @@ pub extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_PlayerDsd_getTrackP
     _class: JClass,
     handle: jlong,
 ) -> jfloat {
-    let player = unsafe{(handle as *mut DsdPlayer).as_mut().unwrap()};
+    let player = unsafe{(handle as *mut Box<dyn DSDPlayer>).as_mut().unwrap()};
     player.get_current_position_percents() as jfloat
 }
 #[cfg(target_os = "linux")]
@@ -109,7 +112,7 @@ pub extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_PlayerDsd_setPlayin
     handle: jlong,
     is_playing: jboolean,
 ) {
-    let player = unsafe{(handle as *mut DsdPlayer).as_mut().unwrap()};
+    let player = unsafe{(handle as *mut Box<dyn DSDPlayer>).as_mut().unwrap()};
     if is_playing != 0 {
         player.play();
     } else {
@@ -123,7 +126,7 @@ pub extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_PlayerDsd_isPlaying
     _class: JClass,
     handle: jlong,
 ) -> jboolean {
-    let player = unsafe{(handle as *mut DsdPlayer).as_mut().unwrap()};
+    let player = unsafe{(handle as *mut Box<dyn DSDPlayer>).as_mut().unwrap()};
     player.is_playing() as jboolean
 }
 #[cfg(target_os = "linux")]
@@ -133,6 +136,6 @@ pub extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_PlayerDsd_stop(
     _class: JClass,
     handle: jlong,
 ) {
-    let player = unsafe{(handle as *mut DsdPlayer).as_mut().unwrap()};
+    let player = unsafe{((handle as *mut Box<dyn DSDPlayer>).as_mut().unwrap())};
     player.stop();
 }

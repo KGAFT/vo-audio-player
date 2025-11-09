@@ -38,11 +38,11 @@ pub unsafe extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_CueParser_pa
  */
 #[unsafe(no_mangle)]
 pub unsafe extern "system" fn Java_com_kgaft_VoidAudioPlayer_Native_CueParser_decodeText(
-    mut env: JNIEnv,
+    env: JNIEnv,
     _class: JClass,
     data: jbyteArray,
 ) -> jstring {
-    let bytes: Vec<u8> = env.convert_byte_array(&JByteArray::from_raw(data)).unwrap();
+    let bytes: Vec<u8> = env.convert_byte_array(&unsafe{JByteArray::from_raw(data)}).unwrap();
     let decoded = binary_to_text(bytes.as_slice());
     env.new_string(decoded).unwrap().as_raw()
 }
