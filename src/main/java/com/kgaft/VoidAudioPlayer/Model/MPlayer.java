@@ -6,6 +6,7 @@ import com.kgaft.VoidAudioPlayer.Verbose.Track;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 
 public class MPlayer {
@@ -16,7 +17,7 @@ public class MPlayer {
     private static DsdDeviceInfo selectedDsdDevice = null;
     private static boolean dsdPlaying = false;
     private static Track currentTrack = null;
-
+    private static volatile AtomicInteger startTrackIndexSignal = new AtomicInteger(-1);
     public static List<String> enumerateDevices() {
         return Player.getDevices();
     }
@@ -73,18 +74,34 @@ public class MPlayer {
                         } catch (InterruptedException e) {
                             throw new RuntimeException(e);
                         }
+                        if(startTrackIndexSignal.get()!=-1){
+                            counter = startTrackIndexSignal.get();
+                            startTrackIndexSignal.set(-1);
+                            PlayerDsd.stop(dsdPlayer);
+                            break;
+                        }
                     }
                     System.err.println("Next track");
                 } else {
                     while(Player.isPlaying(nativePlayer)){
                         try {
                             Thread.sleep(50);
+                            if(startTrackIndexSignal.get()!=-1){
+                                counter = startTrackIndexSignal.get()-1;
+                                startTrackIndexSignal.set(-1);
+                                Player.stop(nativePlayer);
+                                break;
+                            }
                         } catch (InterruptedException e) {}
                     }
                 }
                 counter++;
             }
         }).start();
+    }
+
+    public static void startPlayingTrackFromPlaylist(int index){
+        startTrackIndexSignal.set(index);
     }
 
     public static void loadTrack(int playListStartIndex) {

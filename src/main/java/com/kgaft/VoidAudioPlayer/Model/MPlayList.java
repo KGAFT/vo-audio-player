@@ -18,7 +18,8 @@ public class MPlayList {
     public void addTrackBetween(int startIndex, Track track){
         trackList.add(startIndex, track);
     }
-    protected List<Track> getTrackList(){
+    public List<Track> getTrackList(){
         return trackList;
     }
+
 }

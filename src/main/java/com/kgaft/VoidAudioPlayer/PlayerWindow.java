@@ -1,5 +1,6 @@
 package com.kgaft.VoidAudioPlayer;
 
+import com.kgaft.VoidAudioPlayer.Ui.PlaylistPanel;
 import com.kgaft.VoidAudioPlayer.Verbose.Track;
 import com.kgaft.VoidAudioPlayer.Ui.Album.AlbumInfoPanel;
 import com.kgaft.VoidAudioPlayer.Ui.Album.AlbumListPanel;
@@ -22,6 +23,7 @@ public class PlayerWindow extends JFrame implements IOnAlbumSelected, ActionList
     private TrackPanel trackPanel;
     private AlbumListPanel albumListPanel;
     private PlayerPanel playerPanel = new PlayerPanel(200, 50);
+    private PlaylistPanel playlistPanel = new PlaylistPanel();
     private boolean isAlbumList = true;
     private AlbumInfoPanel albumInfoPanel;
     private Album currentAlbum = null;
@@ -38,6 +40,7 @@ public class PlayerWindow extends JFrame implements IOnAlbumSelected, ActionList
         add(trackPanel, BorderLayout.CENTER);
         add(playerPanel, BorderLayout.SOUTH);
         add(albumListPanel, BorderLayout.WEST);
+        add(playlistPanel, BorderLayout.EAST);
         albumListPanel.setOnAlbumSelected(this);
         setVisible(true);
     }
@@ -87,6 +90,7 @@ public class PlayerWindow extends JFrame implements IOnAlbumSelected, ActionList
         remove(trackPanel);
         trackPanel = new TrackPanel(track);
         add(trackPanel, BorderLayout.CENTER);
+        playlistPanel.updateTracks();
         invalidate();
         validate();
         // playerPanel.seekTrack();
