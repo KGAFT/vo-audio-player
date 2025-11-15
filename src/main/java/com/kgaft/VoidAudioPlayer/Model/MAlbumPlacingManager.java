@@ -1,8 +1,6 @@
 package com.kgaft.VoidAudioPlayer.Model;
 
-import com.kgaft.VoidAudioPlayer.Ui.Album.AlbumCard;
 import com.kgaft.VoidAudioPlayer.Verbose.Album;
-import com.kgaft.VoidAudioPlayer.Verbose.Track;
 
 import java.util.*;
 import java.util.stream.Collectors;

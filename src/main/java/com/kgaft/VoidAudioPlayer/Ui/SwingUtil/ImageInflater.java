@@ -1,6 +1,4 @@
-package com.kgaft.VoidAudioPlayer.Ui.Util;
-
-import com.formdev.flatlaf.extras.FlatSVGIcon;
+package com.kgaft.VoidAudioPlayer.Ui.SwingUtil;
 
 import javax.imageio.ImageIO;
 import javax.swing.*;

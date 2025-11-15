@@ -1,4 +1,4 @@
-package com.kgaft.VoidAudioPlayer.Ui.Util;
+package com.kgaft.VoidAudioPlayer.Ui.SwingUtil;
 
 public enum ResizerWorkMode {
     USE_ONLY_WIDTH,

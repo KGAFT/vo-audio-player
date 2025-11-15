@@ -5,9 +5,11 @@ import com.formdev.flatlaf.themes.FlatMacDarkLaf;
 import com.kgaft.VoidAudioPlayer.Model.DsdDeviceInfo;
 import com.kgaft.VoidAudioPlayer.Model.MPlayer;
 import com.kgaft.VoidAudioPlayer.Native.CueParser;
+import com.kgaft.VoidAudioPlayer.Ui.Terminal.PlayerTerminal;
 import com.kgaft.VoidAudioPlayer.Verbose.*;
 import javax.swing.*;
 import java.io.File;
+import java.io.IOException;
 import java.util.List;
 import java.util.Scanner;
 
@@ -27,7 +29,7 @@ public class Main {
         }
     }
 
-    public static void main(String[] args) throws InterruptedException {
+    public static void main(String[] args) throws InterruptedException, IOException {
 
         LibraryIndex index = LibraryIndex.getInstance();
        // index.addDirectory("/mnt/hdd/Music");
@@ -38,7 +40,7 @@ public class Main {
         }
 
 
-
+        /*
         List<DsdDeviceInfo> devices = MPlayer.enumerateDsdDevices();
         for (int i = 0; i < devices.size(); i++) {
             System.out.println("id: "+i +" device name: "+devices.get(i).getName());
@@ -47,8 +49,9 @@ public class Main {
         Scanner scanner = new Scanner(System.in);
         DsdDeviceInfo name = devices.get(scanner.nextInt());
         MPlayer.initDsdDevice(name);
-        PlayerWindow window = new PlayerWindow(index.getAlbums());
 
+         */
+        PlayerTerminal playerTerminal = new PlayerTerminal();
 
     }
 }

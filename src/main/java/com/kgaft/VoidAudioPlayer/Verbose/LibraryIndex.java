@@ -15,10 +15,18 @@ import java.util.Optional;
 
 public class LibraryIndex {
     private static ConnectionSource connection = null;
+    private static String databaseUrl;
+
+    public static String getDatabaseUrl() {
+        return databaseUrl;
+    }
+
+    public static void setDatabaseUrl(String databaseUrl) {
+        LibraryIndex.databaseUrl = "jdbc:sqlite:"+databaseUrl;
+    }
 
     private static ConnectionSource getConnection() {
         if (connection == null) {
-            String databaseUrl = "jdbc:sqlite:./mydatabase.db";
             try {
                 connection = new JdbcConnectionSource(databaseUrl);
             } catch (SQLException e) {

@@ -1,4 +1,4 @@
-package com.kgaft.VoidAudioPlayer.Ui.Util;
+package com.kgaft.VoidAudioPlayer.Ui.SwingUtil;
 
 public class Extent {
     public int width;
