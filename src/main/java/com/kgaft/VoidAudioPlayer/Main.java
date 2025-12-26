@@ -2,20 +2,17 @@ package com.kgaft.VoidAudioPlayer;
 
 
 import com.formdev.flatlaf.themes.FlatMacDarkLaf;
-import com.kgaft.VoidAudioPlayer.Model.DsdDeviceInfo;
-import com.kgaft.VoidAudioPlayer.Model.MPlayer;
-import com.kgaft.VoidAudioPlayer.Native.CueParser;
+import com.kgaft.VoidAudioPlayer.Model.MSettings;
+import com.kgaft.VoidAudioPlayer.Ui.ProgressAcceptor;
 import com.kgaft.VoidAudioPlayer.Ui.Terminal.PlayerTerminal;
 import com.kgaft.VoidAudioPlayer.Verbose.*;
 import javax.swing.*;
 import java.io.File;
 import java.io.IOException;
-import java.util.List;
-import java.util.Scanner;
 
 //Testing purposes only, in future will be organised!
 
-public class Main {
+public class Main implements  ProgressAcceptor{
     static {
         File file = new File("target/debug");
         for (File listFile : file.listFiles()) {
@@ -30,9 +27,9 @@ public class Main {
     }
 
     public static void main(String[] args) throws InterruptedException, IOException {
-
+        MSettings.readSettingsOrDefault().applySettings();
         LibraryIndex index = LibraryIndex.getInstance();
-       // index.addDirectory("/mnt/hdd/Music");
+        //index.addDirectory("/mnt/hdd/Music", new Main());
         try {
             UIManager.setLookAndFeel(new FlatMacDarkLaf());
         } catch (Exception e) {
@@ -53,5 +50,15 @@ public class Main {
          */
         PlayerTerminal playerTerminal = new PlayerTerminal();
 
+    }
+
+    @Override
+    public void setProgress(float progress) {
+        System.out.print("Current progress: "+progress);
+    }
+
+    @Override
+    public void setCurrentState(String state) {
+        System.out.println(" Current state: "+state);
     }
 }

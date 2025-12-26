@@ -5,6 +5,7 @@ import com.bunjlabs.jecue.entities.CueSheet;
 import com.bunjlabs.jecue.entities.CueTrackIndex;
 import com.bunjlabs.jecue.entities.CueTrackInfo;
 import com.kgaft.VoidAudioPlayer.Native.CueParser;
+import com.kgaft.VoidAudioPlayer.Ui.ProgressAcceptor;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
@@ -47,16 +48,24 @@ public class LibraryParser {
     }
 
 
-    public static void recurrentIterDirectory(String path, List<Album> output) {
-
+    public static void recurrentIterDirectory(String path, List<Album> output, ProgressAcceptor progressInfo) {
         File f = new File(path);
         if (!f.isDirectory()) {
             return;
         }
         inspectDir(new File(path), output);
-        for (File file : Objects.requireNonNull(f.listFiles())) {
+        File[] files =  Objects.requireNonNull(f.listFiles());
+        for (int i = 0; i<files.length; i++) {
+            File file = files[i];
+            if(progressInfo!=null){
+                progressInfo.setProgress((float)i/(float)files.length);
+
+            }
             if (file.isDirectory()) {
-                recurrentIterDirectory(file.getAbsolutePath(), output);
+                if(progressInfo!=null) {
+                    progressInfo.setCurrentState(file.getAbsolutePath());
+                }
+                recurrentIterDirectory(file.getAbsolutePath(), output, null);
             }
         }
         return;

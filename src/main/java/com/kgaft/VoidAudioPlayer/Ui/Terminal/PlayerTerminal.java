@@ -22,7 +22,7 @@ public class PlayerTerminal {
         Panel panel = new Panel();
 
         ActionListBox list = new ActionListBox(new TerminalSize(20, 10));
-        list.addItem("Settings", () -> System.out.println("Starting..."));
+        list.addItem("Settings", () -> window.setComponent(new SettingsPanel(window, panel)));
         list.addItem("Collection", () -> System.out.println("Stopping..."));
 
         panel.addComponent(list);

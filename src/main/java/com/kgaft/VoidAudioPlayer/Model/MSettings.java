@@ -17,24 +17,30 @@ public class MSettings {
     public static Path getUserConfigDir(String appName) {
         String os = System.getProperty("os.name").toLowerCase();
         String userHome = System.getProperty("user.home");
-
+        Path resultPath = null;
         if (os.contains("win")) {
             String appData = System.getenv("APPDATA");
             if (appData != null) {
-                return Path.of(appData, appName);
+                resultPath = Path.of(appData, appName);
+            } else {
+                resultPath = Path.of(userHome, "AppData", "Roaming", appName);
             }
-            return Path.of(userHome, "AppData", "Roaming", appName);
 
         } else if (os.contains("mac")) {
-            return Path.of(userHome, "Library", "Application Support", appName);
-
+            resultPath = Path.of(userHome, "Library", "Application Support", appName);
         } else {
             String xdg = System.getenv("XDG_CONFIG_HOME");
             if (xdg != null && !xdg.isBlank()) {
-                return Path.of(xdg, appName);
+                resultPath = Path.of(xdg, appName);
+            } else{
+                resultPath = Path.of(userHome, ".config", appName);
             }
-            return Path.of(userHome, ".config", appName);
         }
+        File file = resultPath.toFile();
+        if(!file.exists()){
+            file.mkdirs();
+        }
+        return resultPath;
     }
     public static MSettings readSettingsOrDefault(){
         if(currentSettings == null){
@@ -74,8 +80,8 @@ public class MSettings {
     }
 
     private String collectionDBPath = getUserConfigDir("void-audio").resolve("collection.db").toAbsolutePath().toString();
-    private String defaultDsdPlaybackDeviceName;
-    private String defaultGstPlaybackDevice;
+    private String defaultDsdPlaybackDeviceName = "";
+    private String defaultGstPlaybackDevice = "";
 
     public List<String> showAvailableGstDevices(){
         return MPlayer.enumerateDevices();
@@ -90,7 +96,7 @@ public class MSettings {
         List<DsdDeviceInfo> devices = MPlayer.enumerateDsdDevices();
         List<String> result = new ArrayList<>();
         devices.forEach(device -> {
-            result.add(device.getDescription()+"/:/"+device.getName());
+            result.add((device.getDescription()+"/:/"+device.getName()).replace("\n", ""));
         });
         return result;
     }
@@ -100,7 +106,7 @@ public class MSettings {
         MPlayer.initDsdDevice(info);
         this.defaultDsdPlaybackDeviceName = device;
     }
-    private void applySettings(){
+    public void applySettings(){
         if(!this.defaultDsdPlaybackDeviceName.isEmpty()){
             setDsdDevice(this.defaultDsdPlaybackDeviceName);
         }

@@ -6,6 +6,7 @@ import com.j256.ormlite.jdbc.JdbcConnectionSource;
 import com.j256.ormlite.stmt.PreparedQuery;
 import com.j256.ormlite.support.ConnectionSource;
 import com.j256.ormlite.table.TableUtils;
+import com.kgaft.VoidAudioPlayer.Ui.ProgressAcceptor;
 
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -16,6 +17,7 @@ import java.util.Optional;
 public class LibraryIndex {
     private static ConnectionSource connection = null;
     private static String databaseUrl;
+    private static List<LibraryIndex> instances = new ArrayList<>();
 
     public static String getDatabaseUrl() {
         return databaseUrl;
@@ -23,12 +25,23 @@ public class LibraryIndex {
 
     public static void setDatabaseUrl(String databaseUrl) {
         LibraryIndex.databaseUrl = "jdbc:sqlite:"+databaseUrl;
+        try {
+            updateConnection();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+        instances.forEach(instance -> {
+            instance.initRoutine(getConnection());
+        });
+    }
+    private static void updateConnection() throws SQLException {
+        connection = new JdbcConnectionSource(databaseUrl);
     }
 
     private static ConnectionSource getConnection() {
         if (connection == null) {
             try {
-                connection = new JdbcConnectionSource(databaseUrl);
+                updateConnection();
             } catch (SQLException e) {
                 throw new RuntimeException(e);
             }
@@ -41,10 +54,15 @@ public class LibraryIndex {
     private Dao<Artist, Long> artistDao;
     private Dao<IndexedDirectory, Long> indexedDirectoryDao;
     public static LibraryIndex getInstance() {
-        return new LibraryIndex(getConnection());
+        LibraryIndex index = new LibraryIndex(getConnection());
+        instances.add(index);
+        return index;
     }
 
     public LibraryIndex(ConnectionSource connection) {
+        initRoutine(connection);
+    }
+    private void initRoutine(ConnectionSource connection){
         try {
             TableUtils.createTableIfNotExists(connection, Artist.class);
             TableUtils.createTableIfNotExists(connection, Album.class);
@@ -107,13 +125,13 @@ public class LibraryIndex {
     }
 
     private void findUncheckedDirectory(String path){
-
+        
     }
 
 
-    public void addDirectory(String directory) {
+    public void addDirectory(String directory, ProgressAcceptor progressInfo) {
         List<Album> albumList = new ArrayList<>();
-        LibraryParser.recurrentIterDirectory(directory, albumList);
+        LibraryParser.recurrentIterDirectory(directory, albumList, progressInfo);
         albumList.sort(Comparator.comparing(Album::getName).reversed());
         List<Artist> artistList = new ArrayList<>();
         List<Track> trackList = new ArrayList<>();
