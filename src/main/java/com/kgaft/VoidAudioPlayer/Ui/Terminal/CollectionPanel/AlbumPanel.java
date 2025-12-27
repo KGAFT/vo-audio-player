@@ -25,6 +25,6 @@ public class AlbumPanel implements IOptionConsumer {
     @Override
     public void optionSelected(long id, Object userData, Object option) {
         Album album = (Album) option;
-        TracksPanel tracksPanel = new TracksPanel(parentWindow, null, selectorPanel, null, this, album.getTracks().toArray());
+        TracksPanel tracksPanel = new TracksPanel(parentWindow, null, selectorPanel, album.getTracks().toArray());
     }
 }

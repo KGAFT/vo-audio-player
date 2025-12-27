@@ -13,7 +13,7 @@ import com.kgaft.VoidAudioPlayer.Verbose.Track;
 
 import java.util.List;
 
-public class CollectionPanel extends Panel implements IOptionConsumer {
+public class CollectionPanel extends Panel {
     private Window parentWindow;
     private Panel panelToReturn;
     private ActionListBox listBox;
@@ -38,7 +38,7 @@ public class CollectionPanel extends Panel implements IOptionConsumer {
         });
         listBox.addItem("Tracks ---> ", () -> {
             List<Track> tracks = MCollection.getTracks();
-            TracksPanel tracksPanel = new TracksPanel(parentWindow, null, this, null, this, tracks.toArray());
+            TracksPanel tracksPanel = new TracksPanel(parentWindow, null, this, tracks.toArray());
         });
         listBox.addItem("Artists ---> ", () -> {
             List<Artist> artists = MCollection.getArtists();
@@ -48,8 +48,5 @@ public class CollectionPanel extends Panel implements IOptionConsumer {
         addComponent(exitButton);
     }
 
-    @Override
-    public void optionSelected(long id, Object userData, Object option) {
 
-    }
 }
