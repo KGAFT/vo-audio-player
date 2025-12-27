@@ -6,11 +6,13 @@ import com.googlecode.lanterna.screen.Screen;
 import com.googlecode.lanterna.screen.TerminalScreen;
 import com.googlecode.lanterna.terminal.DefaultTerminalFactory;
 import com.googlecode.lanterna.terminal.Terminal;
+import com.kgaft.VoidAudioPlayer.Ui.Terminal.CollectionPanel.CollectionPanel;
 
 import java.io.IOException;
 
 public class PlayerTerminal {
     private Screen screen;
+
     public PlayerTerminal() throws IOException {
         Terminal terminal = new DefaultTerminalFactory().createTerminal();
         screen = new TerminalScreen(terminal);
@@ -23,7 +25,7 @@ public class PlayerTerminal {
 
         ActionListBox list = new ActionListBox(new TerminalSize(20, 10));
         list.addItem("Settings", () -> window.setComponent(new SettingsPanel(window, panel)));
-        list.addItem("Collection", () -> System.out.println("Stopping..."));
+        list.addItem("Collection", () -> window.setComponent(new CollectionPanel(window, panel)));
 
         panel.addComponent(list);
         panel.addComponent(new Button("Exit", window::close));

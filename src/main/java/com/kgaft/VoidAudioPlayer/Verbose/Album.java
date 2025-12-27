@@ -154,4 +154,9 @@ public class Album {
     public void setTracks(List<Track> tracks) {
         this.tracks = tracks;
     }
+
+    @Override
+    public String toString() {
+        return this.name;
+    }
 }

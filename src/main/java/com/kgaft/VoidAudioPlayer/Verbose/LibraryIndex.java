@@ -6,6 +6,7 @@ import com.j256.ormlite.jdbc.JdbcConnectionSource;
 import com.j256.ormlite.stmt.PreparedQuery;
 import com.j256.ormlite.support.ConnectionSource;
 import com.j256.ormlite.table.TableUtils;
+import com.kgaft.VoidAudioPlayer.Model.MSettings;
 import com.kgaft.VoidAudioPlayer.Ui.ProgressAcceptor;
 
 import java.sql.SQLException;
@@ -190,7 +191,7 @@ public class LibraryIndex {
 
     public List<Artist> getArtists() {
         try {
-            return artistDao.queryForAll();
+            return artistDao.queryBuilder().orderBy("name", true).query();
         } catch (SQLException e) {
             e.printStackTrace();
             return null;
@@ -199,7 +200,7 @@ public class LibraryIndex {
 
     public List<Track> getTracks() {
         try {
-            return trackDao.queryForAll();
+            return trackDao.queryBuilder().orderBy("name", true).query();
         } catch (SQLException e) {
             e.printStackTrace();
             return null;

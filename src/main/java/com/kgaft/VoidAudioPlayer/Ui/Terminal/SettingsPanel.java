@@ -4,6 +4,8 @@ import com.googlecode.lanterna.gui2.*;
 import com.googlecode.lanterna.gui2.dialogs.TextInputDialog;
 import com.googlecode.lanterna.gui2.dialogs.TextInputDialogBuilder;
 import com.kgaft.VoidAudioPlayer.Model.MSettings;
+import com.kgaft.VoidAudioPlayer.Ui.Terminal.SelectorPanel.SelectorPanel;
+
 import java.io.File;
 
 enum ActionResult{
@@ -38,10 +40,10 @@ public class SettingsPanel extends Panel implements IOptionConsumer {
         gstDevice = new Label("GStreamer device: " + currentSettings.getDefaultGstPlaybackDevice());
         listBox = new ActionListBox();
         listBox.addItem("Select dsd device --->", () -> {
-            new SelectorPanel(parentWindow, ActionResult.DSD_DEVICE_SELECTED,this, "Here is available dsd devices: ", currentSettings.showAvailableDsdDevices());
+            new SelectorPanel(parentWindow, ActionResult.DSD_DEVICE_SELECTED,this, this, this,"Here is available dsd devices: ", currentSettings.showAvailableDsdDevices().toArray());
         });
         listBox.addItem("Select GStreamer device --->", () -> {
-            new SelectorPanel(parentWindow, ActionResult.GST_DEVICE_SELECTED, this, "Select GStreamer device", currentSettings.showAvailableGstDevices());
+            new SelectorPanel(parentWindow, ActionResult.GST_DEVICE_SELECTED, this, this,this,"Select GStreamer device", currentSettings.showAvailableGstDevices().toArray());
         });
         listBox.addItem("Set path to collection database --->", ()->{
             TextInputDialog textInput = new TextInputDialogBuilder().setPasswordInput(false).setTitle("Set path to collection database").build();
@@ -62,15 +64,15 @@ public class SettingsPanel extends Panel implements IOptionConsumer {
         addComponent(exitButton);
     }
     @Override
-    public void optionSelected(Object userData, String option) {
+    public void optionSelected(long id, Object userData, Object option) {
         ActionResult result = (ActionResult) userData;
         switch (result){
             case DSD_DEVICE_SELECTED -> {
-                currentSettings.setDsdDevice(option);
+                currentSettings.setDsdDevice(option.toString());
                 break;
             }
             case GST_DEVICE_SELECTED -> {
-                currentSettings.setGstDevice(option);
+                currentSettings.setGstDevice(option.toString());
                 break;
             }
         }

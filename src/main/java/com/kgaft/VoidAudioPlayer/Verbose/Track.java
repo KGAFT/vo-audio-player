@@ -190,6 +190,11 @@ public class Track {
     }
 
     @Override
+    public String toString() {
+        return this.name;
+    }
+
+    @Override
     public boolean equals(Object obj) {
         if(obj.getClass() == this.getClass()){
             Track track = (Track) obj;

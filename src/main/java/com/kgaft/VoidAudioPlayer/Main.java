@@ -2,6 +2,7 @@ package com.kgaft.VoidAudioPlayer;
 
 
 import com.formdev.flatlaf.themes.FlatMacDarkLaf;
+import com.kgaft.VoidAudioPlayer.Model.MCollection;
 import com.kgaft.VoidAudioPlayer.Model.MSettings;
 import com.kgaft.VoidAudioPlayer.Ui.ProgressAcceptor;
 import com.kgaft.VoidAudioPlayer.Ui.Terminal.PlayerTerminal;
@@ -29,7 +30,8 @@ public class Main implements  ProgressAcceptor{
     public static void main(String[] args) throws InterruptedException, IOException {
         MSettings.readSettingsOrDefault().applySettings();
         LibraryIndex index = LibraryIndex.getInstance();
-        //index.addDirectory("/mnt/hdd/Music", new Main());
+        MCollection.init(index);
+  //      index.addDirectory("/mnt/hdd/Music", new Main());
         try {
             UIManager.setLookAndFeel(new FlatMacDarkLaf());
         } catch (Exception e) {
