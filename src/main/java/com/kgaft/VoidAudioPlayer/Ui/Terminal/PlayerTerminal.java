@@ -9,29 +9,43 @@ import com.googlecode.lanterna.terminal.Terminal;
 import com.kgaft.VoidAudioPlayer.Ui.Terminal.CollectionPanel.CollectionPanel;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 public class PlayerTerminal {
     private Screen screen;
+    private MultiWindowTextGUI gui;
+    private List<Window> controlledWindows = new ArrayList<>();
 
     public PlayerTerminal() throws IOException {
         Terminal terminal = new DefaultTerminalFactory().createTerminal();
         screen = new TerminalScreen(terminal);
         screen.startScreen();
 
-        MultiWindowTextGUI gui = new MultiWindowTextGUI(screen);
-        BasicWindow window = new BasicWindow("Action List");
+        gui = new MultiWindowTextGUI(screen);
 
-        Panel panel = new Panel();
+    }
 
-        ActionListBox list = new ActionListBox(new TerminalSize(20, 10));
-        list.addItem("Settings", () -> window.setComponent(new SettingsPanel(window, panel)));
-        list.addItem("Collection", () -> window.setComponent(new CollectionPanel(window, panel)));
+    public void registerWindow(Window window){
+        controlledWindows.add(window);
+    }
 
-        panel.addComponent(list);
-        panel.addComponent(new Button("Exit", window::close));
+    public synchronized void start(){
+        try{
+            controlledWindows.forEach(window -> {
+                gui.waitForWindowToClose(window);
+            });
+            screen.stopScreen();
+        }catch (Exception e){
+            throw new RuntimeException(e);
+        }
+    }
 
-        window.setComponent(panel);
-        gui.addWindowAndWait(window);
-        screen.stopScreen();
+    public Screen getScreen() {
+        return screen;
+    }
+
+    public MultiWindowTextGUI getGui() {
+        return gui;
     }
 }

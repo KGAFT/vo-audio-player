@@ -5,7 +5,9 @@ import com.formdev.flatlaf.themes.FlatMacDarkLaf;
 import com.kgaft.VoidAudioPlayer.Model.MCollection;
 import com.kgaft.VoidAudioPlayer.Model.MSettings;
 import com.kgaft.VoidAudioPlayer.Ui.ProgressAcceptor;
+import com.kgaft.VoidAudioPlayer.Ui.Terminal.PlayerMenuWindow;
 import com.kgaft.VoidAudioPlayer.Ui.Terminal.PlayerTerminal;
+import com.kgaft.VoidAudioPlayer.Ui.Terminal.PlayerWindow;
 import com.kgaft.VoidAudioPlayer.Verbose.*;
 import javax.swing.*;
 import java.io.File;
@@ -51,7 +53,9 @@ public class Main implements  ProgressAcceptor{
 
          */
         PlayerTerminal playerTerminal = new PlayerTerminal();
+        PlayerMenuWindow menuWindow = new PlayerMenuWindow(playerTerminal);
 
+        playerTerminal.start();
     }
 
     @Override

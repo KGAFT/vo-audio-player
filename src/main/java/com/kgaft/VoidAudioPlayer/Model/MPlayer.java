@@ -16,6 +16,7 @@ public class MPlayer {
     private static String loadedTrackPath = "";
     private static DsdDeviceInfo selectedDsdDevice = null;
     private static boolean dsdPlaying = false;
+    private static boolean isPlaying = false;
     private static Track currentTrack = null;
     private static volatile AtomicInteger startTrackIndexSignal = new AtomicInteger(-1);
     public static List<String> enumerateDevices() {
@@ -143,10 +144,8 @@ public class MPlayer {
             if(track.getOffsetMs()>0 && track.getAlbumDurationMs()>0){
                 Player.seekTrack(nativePlayer, track.getOffsetMs() / (float) track.getAlbumDurationMs());
             }
-
-
-
         }
+        isPlaying = true;
     }
 
     public static float getPosition() {
@@ -178,7 +177,16 @@ public class MPlayer {
         }
     }
 
+    public static void nextTrack(){
+
+    }
+
+    public static void previousTrack() {
+
+    }
+
     public static void pause(){
+        isPlaying = false;
         if(dsdPlaying){
             PlayerDsd.setPlaying(nativePlayer, false);
         } else {
@@ -187,11 +195,16 @@ public class MPlayer {
     }
 
     public static void play(){
+        isPlaying = true;
         if(dsdPlaying){
             PlayerDsd.setPlaying(nativePlayer, true);
         } else {
             Player.setPlaying(nativePlayer, true);
         }
+    }
+
+    public static boolean isPlaying(){
+        return MPlayer.isPlaying;
     }
 
     private static boolean processDsdOperations(Track track) {
