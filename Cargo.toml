@@ -29,7 +29,7 @@ encoding_rs = "0.8"
 iff_rs = "0.1.2"
 torznab = {path = "rust_modules/torznab-rs"}
 tokio = { version = "1.48.0", features = ["rt", "rt-multi-thread", "macros"] }
-ndsd-playback = "0.1"
+ndsd-playback = {path = "rust_modules/ndsd-playback"}
 [target.'cfg(target_os = "linux")'.dependencies]
 alsa-sys = "0.2"
 crossbeam = "0.8"

@@ -1678,8 +1678,6 @@ checksum = "956787520e75e9bd233246045d19f42fb73242759cc57fba9611d940ae96d4b0"
 [[package]]
 name = "ndsd-playback"
 version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4c15e7c7c145d98127fa9b6d9bf835427ecfbf57eda221ddec70fb17070e50d2"
 dependencies = [
  "alsa-sys",
  "byteorder",

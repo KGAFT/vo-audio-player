@@ -13,15 +13,17 @@ public class MPlayer {
     private static long nativePlayer = 0;
     private static long dsdPlayer = 0;
     private static MPlayList playList = new MPlayList();
-    private static String loadedTrackPath = "";
     private static DsdDeviceInfo selectedDsdDevice = null;
-    private static boolean dsdPlaying = false;
-    private static boolean isPlaying = false;
+    private static volatile boolean isPlaying = false;
     private static Track currentTrack = null;
-    private static volatile AtomicInteger startTrackIndexSignal = new AtomicInteger(-1);
+    private static volatile boolean isDsd = false;
+    private static Thread playThread = null;
+    private static Thread dsdPlayBack = null;
     public static List<String> enumerateDevices() {
         return Player.getDevices();
     }
+
+    private static volatile int currentTrackIndex = -1;
 
     public static List<DsdDeviceInfo> enumerateDsdDevices() {
         List<DsdDeviceInfo> dsdDeviceInfoList = new ArrayList<>();
@@ -57,100 +59,80 @@ public class MPlayer {
         return playList;
     }
 
-    public static void startPlayingPlaylist(){
-        new Thread(() -> {
-            int counter = 0;
-            while(counter<playList.getTrackList().size()){
-                System.err.println(counter);
-                loadTrack(counter);
-                try {
-                    Thread.sleep(5000);
-                } catch (InterruptedException e) {
-                    throw new RuntimeException(e);
-                }
-                if(dsdPlaying){
-                    while(PlayerDsd.isPlaying(dsdPlayer)){
-                        try {
-                            Thread.sleep(50);
-                        } catch (InterruptedException e) {
-                            throw new RuntimeException(e);
-                        }
-                        if(startTrackIndexSignal.get()!=-1){
-                            counter = startTrackIndexSignal.get();
-                            startTrackIndexSignal.set(-1);
-                            PlayerDsd.stop(dsdPlayer);
-                            break;
-                        }
-                    }
-                    System.err.println("Next track");
-                } else {
-                    while(Player.isPlaying(nativePlayer)){
-                        try {
-                            Thread.sleep(50);
-                            if(startTrackIndexSignal.get()!=-1){
-                                counter = startTrackIndexSignal.get()-1;
-                                startTrackIndexSignal.set(-1);
-                                Player.stop(nativePlayer);
-                                break;
+    public static void startPlaySession() {
+        if(playThread==null){
+            playThread = new Thread(() -> {
+                while (true) {
+                    if (isPlaying) {
+                        if (isDsd) {
+                            if (!PlayerDsd.isPlaying(dsdPlayer)) {
+                                if (pushPlayListForward())
+                                    processTrack(playList.getTrackList().get(currentTrackIndex));
+                                else
+                                    isPlaying = false;
                             }
-                        } catch (InterruptedException e) {}
+                        } else {
+                            if (!Player.isPlaying(nativePlayer)) {
+                                if (pushPlayListForward())
+                                    processTrack(playList.getTrackList().get(currentTrackIndex));
+                                else
+                                    isPlaying = false;
+                            }
+                        }
                     }
                 }
-                counter++;
-            }
-        }).start();
+            });
+            playThread.start();
+        }
+
     }
 
-    public static void startPlayingTrackFromPlaylist(int index){
-        startTrackIndexSignal.set(index);
+    private static boolean pushPlayListForward() {
+        currentTrackIndex += 1;
+        return currentTrackIndex < playList.getTrackList().size();
     }
 
-    public static void loadTrack(int playListStartIndex) {
-        if (nativePlayer == 0) {
-            initNativePlayer();
-        }
-        Track track = playList.getTrackList().get(playListStartIndex);
-        currentTrack = track;
-        String path = track.getPath().replace('\\', '/');
-        if (!path.startsWith("/")) {
-            path = "/" + path;
-        }
+    private static void processTrack(Track track) {
         if (processDsdOperations(track)) {
-            if (!loadedTrackPath.equals(path)) {
-                PlayerDsd.loadTrack(dsdPlayer, track.getPath());
-                loadedTrackPath = path;
-            }
-            dsdPlaying = true;
-            new Thread(() -> {
-                PlayerDsd.playOnCurrentThread(dsdPlayer);
-            }).start();
-            if(track.getOffsetMs()>0 &&track.getAlbumDurationMs()>0){
-                PlayerDsd.seekTrack(dsdPlayer, (float) track.getOffsetMs() / (float) track.getAlbumDurationMs());
-            }
-        } else {
-            if (!loadedTrackPath.equals(path)) {
-                Player.stop(nativePlayer);
-                Player.loadTrack(nativePlayer, path);
-                loadedTrackPath = path;
-            }
-            dsdPlaying = false;
-            Player.setPlaying(nativePlayer, true);
+            PlayerDsd.loadTrack(dsdPlayer, track.getPath());
+            PlayerDsd.setPlaying(dsdPlayer, true);
 
+            dsdPlayBack = new Thread(()->{
+                PlayerDsd.playOnCurrentThread(dsdPlayer);
+            });
+            dsdPlayBack.start();
             try {
                 Thread.sleep(500);
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }
-            if(track.getOffsetMs()>0 && track.getAlbumDurationMs()>0){
-                Player.seekTrack(nativePlayer, track.getOffsetMs() / (float) track.getAlbumDurationMs());
+            if (track.getOffsetMs() > 0) {
+                PlayerDsd.seekTrack(dsdPlayer, track.getOffsetMs());
             }
+        } else {
+            Player.loadTrack(nativePlayer, track.getPath());
+            Player.setPlaying(nativePlayer, true);
+            if (track.getOffsetMs() > 0) {
+                PlayerDsd.seekTrack(nativePlayer, track.getOffsetMs());
+            }
+        }
+    }
+
+    public static void setPlayListPos(int pos) {
+
+        startPlaySession();
+        currentTrackIndex = pos-1;
+        if(isDsd){
+            PlayerDsd.stop(dsdPlayer);
+        } else {
+            Player.stop(nativePlayer);
         }
         isPlaying = true;
     }
 
     public static float getPosition() {
         float pos = 0;
-        if (dsdPlaying) {
+        if (isDsd) {
             pos = PlayerDsd.getTrackPos(dsdPlayer);
             if (currentTrack.getAlbumDurationMs() == 0 || currentTrack.getOffsetMs() == 0) {
                 return pos;
@@ -164,46 +146,56 @@ public class MPlayer {
 
     public static void seekTrack(float pos) {
         float seek = 0;
-        if(currentTrack.getOffsetMs() == 0 || currentTrack.getAlbumDurationMs() == 0) {
+        if (currentTrack.getOffsetMs() == 0 || currentTrack.getAlbumDurationMs() == 0) {
             seek = pos;
         } else {
-            long tempPos = (long) (currentTrack.getOffsetMs() + currentTrack.getDurationMs()*pos);
-            seek = (float)tempPos/(float)currentTrack.getAlbumDurationMs();
+            long tempPos = (long) (currentTrack.getOffsetMs() + currentTrack.getDurationMs() * pos);
+            seek = (float) tempPos / (float) currentTrack.getAlbumDurationMs();
         }
-        if(dsdPlaying){
+        if (isDsd) {
             PlayerDsd.seekTrack(dsdPlayer, seek);
         } else {
             Player.seekTrack(nativePlayer, seek);
         }
     }
 
-    public static void nextTrack(){
-
+    public static void nextTrack() {
+        if(isDsd){
+            PlayerDsd.stop(dsdPlayer);
+        } else {
+            Player.stop(nativePlayer);
+        }
     }
 
     public static void previousTrack() {
-
+        currentTrackIndex-=2;
+        if(isDsd){
+            PlayerDsd.stop(dsdPlayer);
+        } else {
+            Player.stop(nativePlayer);
+        }
     }
 
-    public static void pause(){
+    public static void pause() {
         isPlaying = false;
-        if(dsdPlaying){
-            PlayerDsd.setPlaying(nativePlayer, false);
+        if (isDsd) {
+            PlayerDsd.setPlaying(dsdPlayer, false);
         } else {
             Player.setPlaying(nativePlayer, false);
         }
     }
 
-    public static void play(){
-        isPlaying = true;
-        if(dsdPlaying){
-            PlayerDsd.setPlaying(nativePlayer, true);
+    public static void play() {
+        startPlaySession();
+        if (isDsd) {
+            PlayerDsd.setPlaying(dsdPlayer, true);
         } else {
             Player.setPlaying(nativePlayer, true);
         }
+        isPlaying = true;
     }
 
-    public static boolean isPlaying(){
+    public static boolean isPlaying() {
         return MPlayer.isPlaying;
     }
 
@@ -211,6 +203,7 @@ public class MPlayer {
         if ((track.getPath().toLowerCase().endsWith(".dsf") || track.getPath().toLowerCase().endsWith(".dff")) && selectedDsdDevice != null) {
             if (dsdPlayer == 0) {
                 dsdPlayer = PlayerDsd.initializePlayer(selectedDsdDevice.getName());
+                isDsd = true;
             }
             return true;
         } else if (selectedDsdDevice != null) {
@@ -218,6 +211,7 @@ public class MPlayer {
                 PlayerDsd.destroyPlayer(dsdPlayer);
                 dsdPlayer = 0;
             }
+            isDsd = false;
         }
         return false;
     }

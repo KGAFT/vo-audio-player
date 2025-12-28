@@ -19,7 +19,7 @@ public class PlayerWindow {
         MPlayer.getPlayList().getTrackList().forEach(element -> {
             int finalIndex = indexCounter.getAndIncrement();
             playListBox.addItem(element.getName(), () -> {
-               MPlayer.startPlayingTrackFromPlaylist(finalIndex);
+               MPlayer.setPlayListPos(finalIndex);
             });
         });
         panel.addComponent(playListBox);
