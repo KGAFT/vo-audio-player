@@ -29,8 +29,9 @@ public class Track {
     private byte channels;
     @DatabaseField
     private int overallBitrate;
-    @DatabaseField(dataType = com.j256.ormlite.field.DataType.BYTE_ARRAY)
     private byte[] pictureBytes;
+    @DatabaseField(foreign = true, foreignAutoCreate = true)
+    private Image cover;
     @DatabaseField
     private long offsetMs;
     @DatabaseField
@@ -38,7 +39,7 @@ public class Track {
     @DatabaseField
     private long albumDurationMs;
 
-    @DatabaseField(foreign = true, foreignAutoRefresh = true, foreignAutoCreate = true)
+    @DatabaseField(foreign = true, foreignAutoCreate = true)
     private Album albumObject;
 
     public Track(String name, String albumName, String artistName, String genre, String path) {
@@ -68,6 +69,15 @@ public class Track {
 
     public Track() {
     }
+
+    public Image getImage() {
+        return cover;
+    }
+
+    public void setImage(Image pictureBytes) {
+        this.cover = pictureBytes;
+    }
+
 
     public byte[] getPictureBytes() {
         return pictureBytes;

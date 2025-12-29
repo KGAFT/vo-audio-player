@@ -7,7 +7,6 @@ import com.bunjlabs.jecue.entities.CueTrackInfo;
 import com.kgaft.VoidAudioPlayer.Native.CueParser;
 import com.kgaft.VoidAudioPlayer.Ui.ProgressAcceptor;
 
-import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -110,8 +109,8 @@ public class LibraryParser {
 
             while (!covers.isEmpty() || index < newAlbums.size()) {
                 boolean found = false;
-                while (index < newAlbums.size() && (newAlbums.get(index).getCover() != null && newAlbums.get(index).getCover().length > 0)) {
-                    if (newAlbums.get(index).getCover() == null || newAlbums.get(index).getCover().length == 0) {
+                while (index < newAlbums.size() && (newAlbums.get(index).getCover() != null && newAlbums.get(index).getCover().getData().length > 0)) {
+                    if (newAlbums.get(index).getCover() == null || newAlbums.get(index).getCover().getData().length == 0) {
                         found = true;
                     }
                     index++;
@@ -123,7 +122,7 @@ public class LibraryParser {
                     if (covers.isEmpty()) {
                         break;
                     }
-                    newAlbums.get(index).setCover(Files.readAllBytes(covers.getFirst().toPath()));
+                    newAlbums.get(index).setCover(new Image(0, Files.readAllBytes(covers.getFirst().toPath())));
                     covers.remove(0);
                 } catch (IOException e) {
                     e.printStackTrace();
@@ -132,7 +131,7 @@ public class LibraryParser {
             HashMap<String, List<String>> localFilters = new HashMap();
             localFilters.put("image", Arrays.stream(IMAGE_EXTENSIONS).toList());
             while(index < newAlbums.size()) {
-                if(newAlbums.get(index).getCover() != null && newAlbums.get(index).getCover().length != 0) {
+                if(newAlbums.get(index).getCover() != null && newAlbums.get(index).getCover().getData().length!=0) {
                     index++;
                     continue;
                 }
@@ -144,7 +143,7 @@ public class LibraryParser {
                         continue;
                     }
                     try {
-                        newAlbums.get(index).setCover(Files.readAllBytes(imagesFiles.get(0).getAbsoluteFile().toPath()));
+                        newAlbums.get(index).setCover(new Image(0, Files.readAllBytes(imagesFiles.get(0).getAbsoluteFile().toPath())));
                     } catch (IOException e) {
                         continue;
                     }
@@ -247,7 +246,7 @@ public class LibraryParser {
                 album1.setTracksList(true);
                 album1.setName(album);
                 album1.setArtist(track.getArtistName());
-                album1.setCover(track.getPictureBytes());
+                album1.setCover(track.getImage());
                 album1.setGenre(track.getGenre());
                 album1.setYear(track.getYear());
                 album1.getTracks().add(track);

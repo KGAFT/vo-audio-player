@@ -10,10 +10,7 @@ import com.kgaft.VoidAudioPlayer.Model.MSettings;
 import com.kgaft.VoidAudioPlayer.Ui.ProgressAcceptor;
 
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 public class LibraryIndex {
     private static ConnectionSource connection = null;
@@ -53,6 +50,7 @@ public class LibraryIndex {
     private Dao<Track, Long> trackDao;
     private Dao<Album, Long> albumDao;
     private Dao<Artist, Long> artistDao;
+    private Dao<Image, Long> imagesDao;
     private Dao<IndexedDirectory, Long> indexedDirectoryDao;
     public static LibraryIndex getInstance() {
         LibraryIndex index = new LibraryIndex(getConnection());
@@ -66,13 +64,16 @@ public class LibraryIndex {
     private void initRoutine(ConnectionSource connection){
         try {
             TableUtils.createTableIfNotExists(connection, Artist.class);
+            TableUtils.createTableIfNotExists(connection, Image.class);
             TableUtils.createTableIfNotExists(connection, Album.class);
             TableUtils.createTableIfNotExists(connection, Track.class);
+
 
             trackDao = DaoManager.createDao(connection, Track.class);
             albumDao = DaoManager.createDao(connection, Album.class);
             artistDao = DaoManager.createDao(connection, Artist.class);
             indexedDirectoryDao = DaoManager.createDao(connection, IndexedDirectory.class);
+            imagesDao = DaoManager.createDao(connection, Image.class);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -129,6 +130,46 @@ public class LibraryIndex {
         
     }
 
+    private void processAlbumImages(List<Album> albumList, HashSet<Image> existingImages){
+        albumList.forEach(album1 -> {
+            if(album1.getCover()==null){
+                album1.setCover(new Image(0, new byte[]{}));
+            }
+            existingImages.add(album1.getCover());
+            Image existing = existingImages.stream()
+                    .filter(img -> img.equals(album1.getCover()))
+                    .findFirst().get();
+            try {
+                imagesDao.createIfNotExists(existing);
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
+            album1.setCover(existing);
+        });
+    }
+
+    private void processTracksImages(List<Track> tracks, HashSet<Image> existingImages){
+        tracks.forEach(track -> {
+            if(track.getImage()==null){
+                if(track.getPictureBytes()!=null && track.getPictureBytes().length!=0){
+                    Image obj = new Image(0, track.getPictureBytes());
+                    track.setImage(obj);
+                } else {
+                    track.setImage(new Image(0, new byte[]{}));
+                }
+            }
+            existingImages.add(track.getImage());
+            Image existing = existingImages.stream()
+                    .filter(img -> img.equals(track.getImage()))
+                    .findFirst().get();
+            try {
+                imagesDao.createIfNotExists(existing);
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
+            track.setImage(existing);
+        });
+    }
 
     public void addDirectory(String directory, ProgressAcceptor progressInfo) {
         List<Album> albumList = new ArrayList<>();
@@ -136,6 +177,11 @@ public class LibraryIndex {
         albumList.sort(Comparator.comparing(Album::getName).reversed());
         List<Artist> artistList = new ArrayList<>();
         List<Track> trackList = new ArrayList<>();
+        HashSet<Image> uniqueImages = new HashSet<>();
+        processTracksImages(trackList, uniqueImages);
+        processAlbumImages(albumList, uniqueImages);
+
+
         albumList.forEach(album -> {
             album.processDuration();
             if(album.getArtist()!=null && !album.getArtist().isEmpty()){

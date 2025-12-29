@@ -16,8 +16,8 @@ public class Album {
     private long id;
     @DatabaseField
     private String artist = "";
-    @DatabaseField(dataType = com.j256.ormlite.field.DataType.BYTE_ARRAY)
-    private byte[] cover;
+    @DatabaseField(foreign = true, foreignAutoCreate = true)
+    private Image cover = null;
     @DatabaseField(canBeNull = false, unique = true)
     private String name = "";
     @ForeignCollectionField(eager = false)
@@ -28,12 +28,12 @@ public class Album {
     private String genre = "";
     @DatabaseField
     private long duration = 0;
-    @DatabaseField(foreign = true, foreignAutoRefresh = true, foreignAutoCreate = true)
+    @DatabaseField(foreign = true, foreignAutoCreate = true)
     private Artist artistObject;
 
     private boolean tracksList = false;
 
-    public Album(byte[] cover, String name, List<Track> tracks) {
+    public Album(Image cover, String name, List<Track> tracks) {
         this.cover = cover;
         this.name = name;
         this.tracks = tracks;
@@ -88,7 +88,7 @@ public class Album {
         this.artistObject = artistObject;
     }
 
-    public byte[] getCover() {
+    public Image getCover() {
         return cover;
     }
 
@@ -128,12 +128,12 @@ public class Album {
         }
     }
 
-    public void setCover(byte[] cover) {
+    public void setCover(Image cover) {
         this.cover = cover;
-        if (tracks != null && tracks.size() > 0) {
+        if (tracks != null && !tracks.isEmpty()) {
             tracks.forEach(track -> {
-                if (track.getPictureBytes() == null) {
-                    track.setPictureBytes(cover);
+                if (track.getImage() == null) {
+                    track.setImage(cover);
                 }
             });
         }
