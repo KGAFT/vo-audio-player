@@ -7,13 +7,17 @@ import java.util.Arrays;
 
 @DatabaseTable(tableName = "images")
 public class Image {
-    @DatabaseField(generatedId = true)
+
+
+    @DatabaseField(id = true)
     private long id;
     @DatabaseField(dataType = com.j256.ormlite.field.DataType.BYTE_ARRAY)
     private byte[] data;
 
+
     public Image(long id, byte[] data) {
-        this.id = id;
+        ///!!! ONLY FOR LOCAL USE. DO NOT TRY THIS IN SERVER SOLUTIONS PLEASE!!!!
+        this.id = Arrays.hashCode(data);
         this.data = data;
     }
 
@@ -33,6 +37,8 @@ public class Image {
     }
 
     public void setData(byte[] data) {
+        ///!!! ONLY FOR LOCAL USE. DO NOT TRY THIS IN SERVER SOLUTIONS PLEASE!!!!
+        this.id = Arrays.hashCode(data);
         this.data = data;
     }
 
@@ -49,6 +55,6 @@ public class Image {
     }
     @Override
     public int hashCode() {
-        return Arrays.hashCode(data);
+        return (int) id;
     }
 }

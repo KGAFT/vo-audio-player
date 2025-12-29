@@ -33,7 +33,7 @@ public class Main implements  ProgressAcceptor{
         MSettings.readSettingsOrDefault().applySettings();
         LibraryIndex index = LibraryIndex.getInstance();
         MCollection.init(index);
-  //      index.addDirectory("/mnt/hdd/Music", new Main());
+  //     index.addDirectory("/mnt/hdd/Music", new Main());
         try {
             UIManager.setLookAndFeel(new FlatMacDarkLaf());
         } catch (Exception e) {

@@ -154,6 +154,7 @@ public class LibraryIndex {
                 if(track.getPictureBytes()!=null && track.getPictureBytes().length!=0){
                     Image obj = new Image(0, track.getPictureBytes());
                     track.setImage(obj);
+                    track.setPictureBytes(null);
                 } else {
                     track.setImage(new Image(0, new byte[]{}));
                 }

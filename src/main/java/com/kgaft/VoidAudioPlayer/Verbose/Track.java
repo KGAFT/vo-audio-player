@@ -30,7 +30,7 @@ public class Track {
     @DatabaseField
     private int overallBitrate;
     private byte[] pictureBytes;
-    @DatabaseField(foreign = true, foreignAutoCreate = true)
+    @DatabaseField(foreign = true)
     private Image cover;
     @DatabaseField
     private long offsetMs;

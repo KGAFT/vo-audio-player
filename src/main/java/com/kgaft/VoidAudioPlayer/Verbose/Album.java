@@ -16,7 +16,7 @@ public class Album {
     private long id;
     @DatabaseField
     private String artist = "";
-    @DatabaseField(foreign = true, foreignAutoCreate = true)
+    @DatabaseField(foreign = true)
     private Image cover = null;
     @DatabaseField(canBeNull = false, unique = true)
     private String name = "";
