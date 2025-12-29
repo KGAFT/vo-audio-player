@@ -112,8 +112,14 @@ public class MPlayer {
         } else {
             Player.loadTrack(nativePlayer, track.getPath());
             Player.setPlaying(nativePlayer, true);
+            try {
+                Thread.sleep(500);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
             if (track.getOffsetMs() > 0) {
-                PlayerDsd.seekTrack(nativePlayer, track.getOffsetMs());
+                float seek = (float) track.getOffsetMs() / track.getAlbumDurationMs();
+                Player.seekTrack(nativePlayer, seek);
             }
         }
     }
