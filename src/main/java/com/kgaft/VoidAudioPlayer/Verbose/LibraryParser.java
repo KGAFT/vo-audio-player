@@ -151,10 +151,7 @@ public class LibraryParser {
                 }
                 index++;
             }
-
-
         }
-
     }
 
     public static CueParseResult processCueSheet(CueSheet sheet, HashMap<String, List<File>> files, List<Album> albums) {

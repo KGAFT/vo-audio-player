@@ -4,6 +4,8 @@ import com.j256.ormlite.dao.Dao;
 import com.j256.ormlite.dao.DaoManager;
 import com.j256.ormlite.jdbc.JdbcConnectionSource;
 import com.j256.ormlite.stmt.PreparedQuery;
+import com.j256.ormlite.stmt.QueryBuilder;
+import com.j256.ormlite.stmt.SelectArg;
 import com.j256.ormlite.support.ConnectionSource;
 import com.j256.ormlite.table.TableUtils;
 import com.kgaft.VoidAudioPlayer.Model.MSettings;
@@ -190,8 +192,11 @@ public class LibraryIndex {
             }
             boolean albumfound = false;
             try {
-                List<Album> albums = albumDao.queryForEq("name", album.getName());
+                QueryBuilder<Album, Long> qb = albumDao.queryBuilder();
+                qb.where().eq("name", new SelectArg(album.getName()));
+                List<Album> albums = albumDao.query(qb.prepare());
                 if(albums.size()>0) {
+                    albumfound = true;
                     Album newAlb = albums.getFirst();
                     newAlb.setTracks((List<Track>) album.getTracks());
                     album.getTracks().forEach(track -> {
@@ -201,7 +206,7 @@ public class LibraryIndex {
                         }
                     });
                     album.setId(newAlb.getId());
-                    albumfound = true;
+
                 }
 
             } catch (SQLException e) {
