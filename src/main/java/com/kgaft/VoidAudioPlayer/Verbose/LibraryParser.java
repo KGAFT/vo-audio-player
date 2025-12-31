@@ -47,24 +47,25 @@ public class LibraryParser {
     }
 
 
-    public static void recurrentIterDirectory(String path, List<Album> output, ProgressAcceptor progressInfo) {
+    public static void recurrentIterDirectory(String path, List<Album> output, List<IndexedDirectory> indexedDirectoriesOutput, ProgressAcceptor progressInfo) {
         File f = new File(path);
         if (!f.isDirectory()) {
             return;
         }
         inspectDir(new File(path), output);
-        File[] files =  Objects.requireNonNull(f.listFiles());
-        for (int i = 0; i<files.length; i++) {
-            File file = files[i];
-            if(progressInfo!=null){
-                progressInfo.setProgress((float)i/(float)files.length);
 
+        File[] files = Objects.requireNonNull(f.listFiles());
+        for (int i = 0; i < files.length; i++) {
+            File file = files[i];
+            if (progressInfo != null) {
+                progressInfo.setProgress((float) i / (float) files.length);
             }
             if (file.isDirectory()) {
-                if(progressInfo!=null) {
+                if (progressInfo != null) {
                     progressInfo.setCurrentState(file.getAbsolutePath());
                 }
-                recurrentIterDirectory(file.getAbsolutePath(), output, null);
+                indexedDirectoriesOutput.add(new IndexedDirectory(file.getAbsolutePath()));
+                recurrentIterDirectory(file.getAbsolutePath(), output, indexedDirectoriesOutput, null);
             }
         }
         return;
@@ -130,8 +131,8 @@ public class LibraryParser {
             }
             HashMap<String, List<String>> localFilters = new HashMap();
             localFilters.put("image", Arrays.stream(IMAGE_EXTENSIONS).toList());
-            while(index < newAlbums.size()) {
-                if(newAlbums.get(index).getCover() != null && newAlbums.get(index).getCover().getData().length!=0) {
+            while (index < newAlbums.size()) {
+                if (newAlbums.get(index).getCover() != null && newAlbums.get(index).getCover().getData().length != 0) {
                     index++;
                     continue;
                 }
@@ -139,7 +140,7 @@ public class LibraryParser {
                 for (File dir : dirs) {
                     HashMap<String, List<File>> images = FileFilter.filterFiles(dir.listFiles(), localFilters);
                     List<File> imagesFiles = images.get("image");
-                    if(imagesFiles == null || imagesFiles.isEmpty()) {
+                    if (imagesFiles == null || imagesFiles.isEmpty()) {
                         continue;
                     }
                     try {
@@ -176,20 +177,20 @@ public class LibraryParser {
                         duration = baseTrack.getDurationMs() - offset;
                     }
                     Track track = new Track(baseTrack);
-                    if(baseTrack.getAlbumName() == null || baseTrack.getAlbumName().isEmpty()){
+                    if (baseTrack.getAlbumName() == null || baseTrack.getAlbumName().isEmpty()) {
                         track.setAlbumName(musicFile.getName());
-                        if(track.getAlbumName()==null || track.getAlbumName().isEmpty()){
+                        if (track.getAlbumName() == null || track.getAlbumName().isEmpty()) {
                             track.setAlbumName(info.getSongwriter());
-                            if(track.getAlbumName()==null ||track.getAlbumName().isEmpty()){
+                            if (track.getAlbumName() == null || track.getAlbumName().isEmpty()) {
                                 track.setAlbumName(musicFile.getName());
                             }
                         }
                     }
-                    if(baseTrack.getArtistName() ==null || baseTrack.getArtistName().isEmpty()){
+                    if (baseTrack.getArtistName() == null || baseTrack.getArtistName().isEmpty()) {
                         track.setArtistName(info.getPerformer());
-                        if(track.getArtistName()==null || track.getArtistName().isEmpty()){
+                        if (track.getArtistName() == null || track.getArtistName().isEmpty()) {
                             track.setArtistName(info.getSongwriter());
-                            if(track.getArtistName()==null ||track.getArtistName().isEmpty()){
+                            if (track.getArtistName() == null || track.getArtistName().isEmpty()) {
                                 track.setArtistName(track.getAlbumName());
                             }
                         }
@@ -232,7 +233,7 @@ public class LibraryParser {
                 if (album1.getName().equals(album)) {
                     found = true;
                     album1.getTracks().add(track);
-                    if(sortTracks) {
+                    if (sortTracks) {
                         album1.sortTracks();
                     }
                     break;
@@ -247,7 +248,7 @@ public class LibraryParser {
                 album1.setGenre(track.getGenre());
                 album1.setYear(track.getYear());
                 album1.getTracks().add(track);
-                if(sortTracks) {
+                if (sortTracks) {
                     album1.sortTracks();
                 }
                 albums.add(album1);
@@ -270,7 +271,7 @@ public class LibraryParser {
     public static CueTrackIndex getIndex(Map<Integer, CueTrackIndex> indexes) {
         int index = 1;
         CueTrackIndex index2 = indexes.get(index);
-        if(index2 == null) {
+        if (index2 == null) {
             index = 0;
         }
         while (index2 == null) {

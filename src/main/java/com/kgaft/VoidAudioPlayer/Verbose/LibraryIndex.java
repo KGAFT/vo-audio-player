@@ -176,7 +176,8 @@ public class LibraryIndex {
 
     public void addDirectory(String directory, ProgressAcceptor progressInfo) {
         List<Album> albumList = new ArrayList<>();
-        LibraryParser.recurrentIterDirectory(directory, albumList, progressInfo);
+        List<IndexedDirectory> indexedDirectories = new ArrayList<>();
+        LibraryParser.recurrentIterDirectory(directory, albumList, indexedDirectories,progressInfo);
         albumList.sort(Comparator.comparing(Album::getName).reversed());
         List<Artist> artistList = new ArrayList<>();
         List<Track> trackList = new ArrayList<>();
