@@ -47,7 +47,7 @@ public class LibraryParser {
     }
 
 
-    public static void recurrentIterDirectory(String path, List<Album> output, List<IndexedDirectory> indexedDirectoriesOutput, ProgressAcceptor progressInfo) {
+    public static void recurrentIterDirectory(String path, List<Album> output, HashSet<IndexedDirectory> indexedDirectoriesOutput, ProgressAcceptor progressInfo) {
         File f = new File(path);
         if (!f.isDirectory()) {
             return;

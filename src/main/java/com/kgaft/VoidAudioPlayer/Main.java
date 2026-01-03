@@ -17,7 +17,7 @@ import java.io.IOException;
 
 public class Main implements  ProgressAcceptor{
     static {
-        File file = new File("target/debug");
+        File file = new File("target/release/");
         for (File listFile : file.listFiles()) {
             if (listFile.getName().endsWith(".so") || listFile.getName().endsWith(".dylib") || listFile.getName().endsWith(".dll")) {
                 try {
@@ -33,7 +33,7 @@ public class Main implements  ProgressAcceptor{
         MSettings.readSettingsOrDefault().applySettings();
         LibraryIndex index = LibraryIndex.getInstance();
         MCollection.init(index);
-       index.addDirectory("/mnt/hdd/Music", new Main());
+       index.refreshCollection(new Main());
         try {
             UIManager.setLookAndFeel(new FlatMacDarkLaf());
         } catch (Exception e) {
@@ -60,11 +60,11 @@ public class Main implements  ProgressAcceptor{
 
     @Override
     public void setProgress(float progress) {
-        System.out.print("Current progress: "+progress);
+        System.err.print("Current progress: "+progress);
     }
 
     @Override
     public void setCurrentState(String state) {
-        System.out.println(" Current state: "+state);
+        System.err.println(" Current state: "+state);
     }
 }

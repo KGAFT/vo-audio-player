@@ -69,7 +69,7 @@ public class LibraryIndex {
             TableUtils.createTableIfNotExists(connection, Image.class);
             TableUtils.createTableIfNotExists(connection, Album.class);
             TableUtils.createTableIfNotExists(connection, Track.class);
-
+            TableUtils.createTableIfNotExists(connection, IndexedDirectory.class);
 
             trackDao = DaoManager.createDao(connection, Track.class);
             albumDao = DaoManager.createDao(connection, Album.class);
@@ -106,30 +106,18 @@ public class LibraryIndex {
         }
     }
 
-    private boolean checkDirectory(String path){
+    private List<String> buildRecheckDirList(){
         try {
-            Optional<IndexedDirectory> res = indexedDirectoryDao.queryForEq("path", path).stream().findAny();
-            if(res.isPresent()){
-                IndexedDirectory directory = res.get();
-                if(directory.recheckNeeded()){
-                    directory = new IndexedDirectory(directory.getPath());
-                    indexedDirectoryDao.createOrUpdate(directory);
-                    return true;
+            List<String> res = new ArrayList<>();
+            indexedDirectoryDao.queryForAll().forEach(dir -> {
+                if(dir.recheckNeeded()){
+                    res.add(dir.getPath());
                 }
-                return false;
-            } else {
-                IndexedDirectory directory = new IndexedDirectory(path);
-                indexedDirectoryDao.createOrUpdate(directory);
-                return true;
-            }
+            });
+            return res;
         } catch (SQLException e) {
-            e.printStackTrace();
+            return new ArrayList<>();
         }
-        return true;
-    }
-
-    private void findUncheckedDirectory(String path){
-        
     }
 
     private void processAlbumImages(List<Album> albumList, HashSet<Image> existingImages){
@@ -174,10 +162,38 @@ public class LibraryIndex {
         });
     }
 
+    public void refreshCollection(ProgressAcceptor progressInfo){
+        List<String> recheckDirs = buildRecheckDirList();
+        HashSet<IndexedDirectory> indexedDirectories = new HashSet<>();
+        List<Album> albumList = new ArrayList<>();
+        recheckDirs.forEach(element->{
+            LibraryParser.recurrentIterDirectory(element, albumList, indexedDirectories,progressInfo);
+            indexedDirectories.forEach(dir -> {
+                try {
+                    indexedDirectoryDao.createIfNotExists(dir);
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                }
+            });
+        });
+        processAlbums(albumList);
+    }
+
     public void addDirectory(String directory, ProgressAcceptor progressInfo) {
         List<Album> albumList = new ArrayList<>();
-        List<IndexedDirectory> indexedDirectories = new ArrayList<>();
+        HashSet<IndexedDirectory> indexedDirectories = new HashSet<>();
         LibraryParser.recurrentIterDirectory(directory, albumList, indexedDirectories,progressInfo);
+        indexedDirectories.forEach(dir -> {
+            try {
+                indexedDirectoryDao.createIfNotExists(dir);
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
+        });
+        processAlbums(albumList);
+    }
+
+    private void processAlbums(List<Album> albumList){
         albumList.sort(Comparator.comparing(Album::getName).reversed());
         List<Artist> artistList = new ArrayList<>();
         List<Track> trackList = new ArrayList<>();

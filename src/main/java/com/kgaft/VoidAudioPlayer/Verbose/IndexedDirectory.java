@@ -9,11 +9,12 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.Objects;
 
 @DatabaseTable(tableName = "indexed_directories")
 public class IndexedDirectory {
-    @DatabaseField(generatedId = true)
+    @DatabaseField(id = true)
     private long id;
     @DatabaseField(unique = true)
     private String path;
@@ -31,6 +32,7 @@ public class IndexedDirectory {
     }
 
     public IndexedDirectory(String path){
+        this.id = path.hashCode();
         this.path = path;
         File file = new File(path);
         File[] children = Objects.requireNonNull(file.listFiles());
@@ -48,17 +50,24 @@ public class IndexedDirectory {
     public boolean recheckNeeded(){
         File file = new File(path);
         File[] children = Objects.requireNonNull(file.listFiles());
+        HashMap<String, Long> curModDates = new HashMap<>();
+        for (File child : children) {
+            curModDates.put(child.getAbsolutePath(), child.lastModified());
+        }
+
         HashMap<String, Long> fileModifiedDates = getFileModifiedDates();
-        if(children.length != fileModifiedDates.size()){
+        if(curModDates.size() != fileModifiedDates.size()){
             return true;
         }
-        for (File child : children) {
-            Long date = fileModifiedDates.get(child.getName());
-            if(date == null){
+        for (Map.Entry<String, Long> entry : curModDates.entrySet()) {
+            String key = entry.getKey();
+            Long cDate = entry.getValue();
+            Long date = fileModifiedDates.get(key);
+            if (date == null) {
                 return true;
             }
-            if(date!=child.lastModified()){
-                return true;
+            if (!date.equals(cDate)) {
+               return true;
             }
         }
         return false;
@@ -114,5 +123,10 @@ public class IndexedDirectory {
         }
 
          */
+    }
+
+    @Override
+    public int hashCode() {
+        return (int) this.id;
     }
 }
