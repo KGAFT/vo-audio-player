@@ -2,6 +2,7 @@ package com.kgaft.VoidAudioPlayer.Ui.Terminal.CollectionPanel;
 
 import com.googlecode.lanterna.gui2.Panel;
 import com.googlecode.lanterna.gui2.Window;
+import com.kgaft.VoidAudioPlayer.Ui.StringUtils.StringManager;
 import com.kgaft.VoidAudioPlayer.Ui.Terminal.IOptionConsumer;
 import com.kgaft.VoidAudioPlayer.Ui.Terminal.SelectorPanel.SelectorPanel;
 import com.kgaft.VoidAudioPlayer.Verbose.Album;
@@ -10,6 +11,7 @@ public class AlbumPanel implements IOptionConsumer {
     private Window parentWindow;
     private Panel panelToReturn;
     private SelectorPanel selectorPanel;
+
     /**
      * @param parentWindow
      * @param userData
@@ -19,7 +21,7 @@ public class AlbumPanel implements IOptionConsumer {
     public AlbumPanel(Window parentWindow, Object userData, Panel panelToReturn, Object[] options) {
         this.panelToReturn = panelToReturn;
         this.parentWindow = parentWindow;
-        selectorPanel = new SelectorPanel(parentWindow, userData, panelToReturn,null, this, "Select album", options);
+        selectorPanel = new SelectorPanel(parentWindow, userData, panelToReturn, null, this, StringManager.getString("select_album"), options);
     }
 
     @Override

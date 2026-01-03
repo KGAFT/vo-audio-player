@@ -3,6 +3,7 @@ package com.kgaft.VoidAudioPlayer.Ui.Terminal.SelectorPanel;
 
 import com.googlecode.lanterna.TerminalSize;
 import com.googlecode.lanterna.gui2.*;
+import com.kgaft.VoidAudioPlayer.Ui.StringUtils.StringManager;
 import com.kgaft.VoidAudioPlayer.Ui.Terminal.IOptionConsumer;
 
 import java.util.List;
@@ -35,7 +36,7 @@ public class SelectorPanel extends Panel {
         }
 
         addComponent(titleLabel);
-        addComponent(new Button("Exit", () -> {
+        addComponent(new Button(StringManager.getString("exit") , () -> {
             parentWindow.setComponent((Panel) this.panelToReturn);
         }));
         addComponent(listBox);

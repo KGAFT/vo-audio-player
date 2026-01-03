@@ -41,21 +41,12 @@ public class Main implements  ProgressAcceptor{
         }
 
 
-        /*
-        List<DsdDeviceInfo> devices = MPlayer.enumerateDsdDevices();
-        for (int i = 0; i < devices.size(); i++) {
-            System.out.println("id: "+i +" device name: "+devices.get(i).getName());
-        }
-        System.out.println("Select dsd device: ");
-        Scanner scanner = new Scanner(System.in);
-        DsdDeviceInfo name = devices.get(scanner.nextInt());
-        MPlayer.initDsdDevice(name);
-
-         */
         PlayerTerminal playerTerminal = new PlayerTerminal();
         PlayerMenuWindow menuWindow = new PlayerMenuWindow(playerTerminal);
 
         playerTerminal.start();
+
+
     }
 
     @Override

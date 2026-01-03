@@ -3,13 +3,12 @@ package com.kgaft.VoidAudioPlayer.Verbose;
 import com.j256.ormlite.dao.Dao;
 import com.j256.ormlite.dao.DaoManager;
 import com.j256.ormlite.jdbc.JdbcConnectionSource;
-import com.j256.ormlite.stmt.PreparedQuery;
 import com.j256.ormlite.stmt.QueryBuilder;
 import com.j256.ormlite.stmt.SelectArg;
 import com.j256.ormlite.support.ConnectionSource;
 import com.j256.ormlite.table.TableUtils;
-import com.kgaft.VoidAudioPlayer.Model.MSettings;
 import com.kgaft.VoidAudioPlayer.Ui.ProgressAcceptor;
+import com.kgaft.VoidAudioPlayer.Verbose.Util.LibraryParser;
 
 import java.sql.SQLException;
 import java.util.*;
@@ -170,7 +169,7 @@ public class LibraryIndex {
             LibraryParser.recurrentIterDirectory(element, albumList, indexedDirectories,progressInfo);
             indexedDirectories.forEach(dir -> {
                 try {
-                    indexedDirectoryDao.createIfNotExists(dir);
+                    indexedDirectoryDao.createOrUpdate(dir);
                 } catch (SQLException e) {
                     e.printStackTrace();
                 }
@@ -185,7 +184,7 @@ public class LibraryIndex {
         LibraryParser.recurrentIterDirectory(directory, albumList, indexedDirectories,progressInfo);
         indexedDirectories.forEach(dir -> {
             try {
-                indexedDirectoryDao.createIfNotExists(dir);
+                indexedDirectoryDao.createOrUpdate(dir);
             } catch (SQLException e) {
                 e.printStackTrace();
             }

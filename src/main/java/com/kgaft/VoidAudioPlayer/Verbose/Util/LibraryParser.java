@@ -1,4 +1,4 @@
-package com.kgaft.VoidAudioPlayer.Verbose;
+package com.kgaft.VoidAudioPlayer.Verbose.Util;
 
 import com.bunjlabs.jecue.CueLoader;
 import com.bunjlabs.jecue.entities.CueSheet;
@@ -6,6 +6,10 @@ import com.bunjlabs.jecue.entities.CueTrackIndex;
 import com.bunjlabs.jecue.entities.CueTrackInfo;
 import com.kgaft.VoidAudioPlayer.Native.CueParser;
 import com.kgaft.VoidAudioPlayer.Ui.ProgressAcceptor;
+import com.kgaft.VoidAudioPlayer.Verbose.Album;
+import com.kgaft.VoidAudioPlayer.Verbose.Image;
+import com.kgaft.VoidAudioPlayer.Verbose.IndexedDirectory;
+import com.kgaft.VoidAudioPlayer.Verbose.Track;
 
 import java.io.File;
 import java.io.IOException;
