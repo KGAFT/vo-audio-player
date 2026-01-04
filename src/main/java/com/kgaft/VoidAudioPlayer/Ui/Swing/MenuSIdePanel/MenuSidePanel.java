@@ -12,12 +12,11 @@ public class MenuSidePanel extends JPanel {
     private JPanel entriesPanel = new JPanel();
     private JPanel contentPanel = new JPanel();
     private SidePanelElement currentElement;
-    public MenuSidePanel(List<SidePanelElement> elements){
+    public MenuSidePanel(List<SidePanelElement> elements, JPanel contentPanel){
         this.elements = elements;
         this.currentElement = this.elements.getFirst();
         setLayout(new BoxLayout(this, BoxLayout.X_AXIS));
         add(entriesPanel);
-        add(contentPanel);
         makeEntriesPanel();
         makeContentPanel();
 

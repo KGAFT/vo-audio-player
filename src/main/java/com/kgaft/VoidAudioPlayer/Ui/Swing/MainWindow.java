@@ -2,6 +2,10 @@ package com.kgaft.VoidAudioPlayer.Ui.Swing;
 
 import com.kgaft.VoidAudioPlayer.Ui.StringUtils.StringManager;
 import com.kgaft.VoidAudioPlayer.Ui.Swing.MenuSIdePanel.*;
+import com.kgaft.VoidAudioPlayer.Ui.Swing.MenuSIdePanel.CollectionElement.CollectionElement;
+import com.kgaft.VoidAudioPlayer.Ui.Swing.MenuSIdePanel.PlayListElement.PlayListElement;
+import com.kgaft.VoidAudioPlayer.Ui.Swing.MenuSIdePanel.SettingsElement.SettingsElement;
+import com.kgaft.VoidAudioPlayer.Ui.Swing.TrackControlPanel.PlayerPanel;
 
 import javax.swing.*;
 import java.awt.*;
@@ -17,8 +21,11 @@ public class MainWindow extends JFrame {
         elements.add(new PlayListElement());
         elements.add(new CollectionElement());
         elements.add(new SettingsElement());
-        rootContainer.add(new MenuSidePanel(elements));
+        JPanel rootPanel = new JPanel();
 
+        rootContainer.add(rootPanel, BorderLayout.CENTER);
+        rootContainer.add(new MenuSidePanel(elements, rootPanel), BorderLayout.WEST);
+        rootContainer.add(new PlayerPanel(getWidth(), getHeight()), BorderLayout.SOUTH);
         add(rootContainer);
         setVisible(true);
     }
