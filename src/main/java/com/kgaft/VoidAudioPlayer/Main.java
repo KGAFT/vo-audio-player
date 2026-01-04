@@ -5,6 +5,7 @@ import com.formdev.flatlaf.themes.FlatMacDarkLaf;
 import com.kgaft.VoidAudioPlayer.Model.MCollection;
 import com.kgaft.VoidAudioPlayer.Model.MSettings;
 import com.kgaft.VoidAudioPlayer.Ui.ProgressAcceptor;
+import com.kgaft.VoidAudioPlayer.Ui.Swing.MainWindow;
 import com.kgaft.VoidAudioPlayer.Ui.Terminal.PlayerMenuWindow;
 import com.kgaft.VoidAudioPlayer.Ui.Terminal.PlayerTerminal;
 import com.kgaft.VoidAudioPlayer.Ui.Terminal.PlayerWindow;
@@ -33,19 +34,22 @@ public class Main implements  ProgressAcceptor{
         MSettings.readSettingsOrDefault().applySettings();
         LibraryIndex index = LibraryIndex.getInstance();
         MCollection.init(index);
-       index.refreshCollection(new Main());
+        //index.addDirectory("/mnt/hdd/Music", new Main());
+        index.refreshCollection(new Main());
         try {
             UIManager.setLookAndFeel(new FlatMacDarkLaf());
         } catch (Exception e) {
             e.printStackTrace();
         }
 
+        MainWindow window = new MainWindow();
 
+        /*
         PlayerTerminal playerTerminal = new PlayerTerminal();
         PlayerMenuWindow menuWindow = new PlayerMenuWindow(playerTerminal);
 
         playerTerminal.start();
-
+         */
 
     }
 

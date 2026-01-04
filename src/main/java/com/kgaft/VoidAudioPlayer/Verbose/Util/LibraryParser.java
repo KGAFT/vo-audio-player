@@ -57,7 +57,7 @@ public class LibraryParser {
             return;
         }
         inspectDir(new File(path), output);
-
+        indexedDirectoriesOutput.add(new IndexedDirectory(path));
         File[] files = Objects.requireNonNull(f.listFiles());
         for (int i = 0; i < files.length; i++) {
             File file = files[i];
@@ -68,7 +68,7 @@ public class LibraryParser {
                 if (progressInfo != null) {
                     progressInfo.setCurrentState(file.getAbsolutePath());
                 }
-                indexedDirectoriesOutput.add(new IndexedDirectory(file.getAbsolutePath()));
+
                 recurrentIterDirectory(file.getAbsolutePath(), output, indexedDirectoriesOutput, null);
             }
         }
