@@ -22,11 +22,13 @@ public class MainWindow extends JFrame {
         elements.add(new CollectionElement());
         elements.add(new SettingsElement());
         JPanel rootPanel = new JPanel();
+        rootPanel.setLayout(new BorderLayout());
 
-        rootContainer.add(rootPanel, BorderLayout.CENTER);
-        rootContainer.add(new MenuSidePanel(elements, rootPanel), BorderLayout.WEST);
         rootContainer.add(new PlayerPanel(getWidth(), getHeight()), BorderLayout.SOUTH);
+        rootContainer.add(new MenuSidePanel(elements, rootPanel), BorderLayout.WEST);
+        rootContainer.add(rootPanel, BorderLayout.CENTER);
         add(rootContainer);
         setVisible(true);
+        System.out.println(isOpaque());
     }
 }

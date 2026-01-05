@@ -15,7 +15,7 @@ public class CollectionElement implements SidePanelElement {
 
     @Override
     public JPanel contentPanel() {
-        return new JPanel();
+        return new CollectionPanel();
     }
 
     private JPanel makeEntryButton(){
